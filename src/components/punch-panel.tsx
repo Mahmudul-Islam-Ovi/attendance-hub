@@ -1,0 +1,106 @@
+"use client";
+import { useEffect, useState, useTransition } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { MapPin, QrCode, Loader2, CheckCircle2, AlertTriangle, Home } from "lucide-react";
+import { punchWithGps, punchWithQr } from "@/app/actions/attendance";
+import { Modal } from "./modal";
+import { QrScanner } from "./qr-scanner";
+import { fmtTime, cn } from "@/lib/utils";
+
+type Props = { checkIn: string | null; checkOut: string | null; wfhAllowed: boolean; officeName: string; radius: number };
+
+export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }: Props) {
+  const [now, setNow] = useState<Date | null>(null);
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [scan, setScan] = useState(false);
+  const [wfh, setWfh] = useState(false);
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const done = !!checkOut;
+  const out = !!checkIn && !checkOut;
+  const label = done ? "Done for today" : out ? "Punch out" : "Punch in";
+
+  function punchGps() {
+    setMsg(null);
+    if (!navigator.geolocation) return setMsg({ ok: false, text: "This browser has no location support." });
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        start(async () => {
+          const r = await punchWithGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, wfh });
+          setMsg(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
+        }),
+      (err) => setMsg({ ok: false, text: err.code === 1 ? "Location permission denied. Allow location access and try again." : "Could not read your location. Move to an open area and retry." }),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
+  function onQr(token: string) {
+    setScan(false);
+    setMsg(null);
+    start(async () => {
+      const r = await punchWithQr(token);
+      setMsg(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 text-center">
+      <div>
+        <p className="text-3xl sm:text-5xl font-bold tabular-nums tracking-tight" suppressHydrationWarning>
+          {now ? now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", timeZone: process.env.NEXT_PUBLIC_APP_TZ || "Asia/Dhaka" }) : "--:--:--"}
+        </p>
+        <p className="mt-1 text-xs sm:text-sm text-slate-500">
+          {checkIn ? `In ${fmtTime(checkIn)}${checkOut ? `, out ${fmtTime(checkOut)}` : ""}` : "You have not punched in yet"}
+        </p>
+      </div>
+
+      <div className="relative grid place-items-center">
+        {!done && !pending && !reduce && (
+          <motion.span className={cn("absolute h-40 w-40 sm:h-44 sm:w-44 rounded-full", out ? "bg-rose-400/40" : "bg-indigo-400/40")}
+            animate={{ scale: [1, 1.35], opacity: [0.6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }} />
+        )}
+        <motion.button whileTap={{ scale: 0.95 }} onClick={punchGps} disabled={done || pending}
+          className={cn("relative grid h-40 w-40 sm:h-44 sm:w-44 place-items-center rounded-full text-white shadow-2xl ring-6 sm:ring-8 ring-white/60 disabled:opacity-60",
+            done ? "bg-slate-400" : out ? "bg-gradient-to-br from-rose-500 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-violet-600")}>
+          <span className="flex flex-col items-center gap-1.5 sm:gap-2">
+            {pending ? <Loader2 className="h-8 w-8 sm:h-9 sm:w-9 animate-spin" /> : <MapPin className="h-8 w-8 sm:h-9 sm:w-9" />}
+            <span className="text-base sm:text-lg font-semibold">{pending ? "Checking..." : label}</span>
+          </span>
+        </motion.button>
+      </div>
+
+      <p className="max-w-xs text-xs text-slate-500">Location punch works within {radius} m of {officeName}.</p>
+
+      <div className="flex w-full max-w-sm flex-col gap-2">
+        <button onClick={() => setScan(true)} disabled={done || pending}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white/80 px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white disabled:opacity-50">
+          <QrCode className="h-4 w-4" /> Scan lobby QR code
+        </button>
+        {wfhAllowed && !checkIn && (
+          <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-white/60 px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 font-medium"><Home className="h-4 w-4 text-sky-600" /> I am working from home</span>
+            <input type="checkbox" className="h-5 w-5 accent-indigo-600" checked={wfh} onChange={(e) => setWfh(e.target.checked)} />
+          </label>
+        )}
+      </div>
+
+      {msg && (
+        <div role="status" className={cn("flex w-full max-w-sm items-start gap-2 rounded-2xl p-3 text-left text-sm", msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>
+          {msg.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
+          {msg.text}
+        </div>
+      )}
+
+      <Modal open={scan} onOpenChange={setScan} title="Scan QR code">
+        {scan && <QrScanner onScan={onQr} />}
+      </Modal>
+    </div>
+  );
+}

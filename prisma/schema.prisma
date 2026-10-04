@@ -1,0 +1,627 @@
+// prisma/schema.prisma
+// Office Attendance & Workflow Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Role hierarchy:
+// L0: SYSTEM_ADMIN  → IT admin, manages system config
+// L1: CEO           → Strategic read-only dashboard + override authority
+// L2: EXECUTIVE_DIRECTOR → Full operational authority, monitors everything
+// L3: DIRECTOR      → Department-level authority
+// L4: HR_ADMIN      → HR functions: hire/fire/payroll/leave
+// L5: MANAGER       → Team management + first-level leave approval
+// L6: EMPLOYEE      → Own data + public directory
+enum SystemRole {
+  SYSTEM_ADMIN
+  CEO
+  EXECUTIVE_DIRECTOR
+  DIRECTOR
+  HR_ADMIN
+  MANAGER
+  EMPLOYEE
+  // Legacy (kept for seed backward-compat, treated same as above)
+  SUPER_ADMIN
+  ADMIN
+  HR
+}
+
+// Org hierarchy: CEO -> Director -> Dept Head -> Manager -> Team Lead -> Employee
+enum OrgLevel {
+  CEO
+  DIRECTOR
+  DEPT_HEAD
+  MANAGER
+  TEAM_LEAD
+  EMPLOYEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  SUSPENDED
+  RESIGNED
+  TERMINATED
+}
+
+// Daily status shown by badges: 🟢 Present, 🟡 Leave, 🔴 Absent, 🔵 WFH, 🟠 Late
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+  WFH
+  HALF_DAY
+  PENDING_APPROVAL
+}
+
+// Hardware-ready: external devices can POST to an API route with their source
+enum AttendanceSource {
+  GPS
+  QR
+  BIOMETRIC
+  RFID
+  FACE
+  MANUAL // admin correction
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  CASUAL
+  MATERNITY
+  PATERNITY
+  UNPAID
+  OFFICIAL_TOUR
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ─────────────────────────────── CORE ────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique // IT, HR, Finance, Forensic, Admin, Management
+  code        String   @unique // e.g. "IT", "HR"
+  description String?
+  color       String?  @default("#6366f1") // used for charts / progress bars
+  icon        String? // lucide icon name
+
+  // Sub-teams: a department may have child teams
+  parentId String?
+  parent   Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  subTeams Department[] @relation("DepartmentTree")
+
+  headId String? @unique
+  head   User?   @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
+
+  members User[]   @relation("DepartmentMembers")
+  tasks   Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+}
+
+model User {
+  id           String           @id @default(cuid())
+  employeeCode String           @unique // e.g. EMP-0001
+  name         String
+  email        String           @unique
+  phone        String?
+  passwordHash String?
+  avatarUrl    String?
+  designation  String? // free text title, e.g. "Senior Forensic Analyst"
+  role         SystemRole       @default(EMPLOYEE)
+  level        OrgLevel         @default(EMPLOYEE)
+  status       EmploymentStatus @default(ACTIVE)
+  joinedAt     DateTime         @default(now())
+
+  // Department
+  departmentId String?
+  department   Department? @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  headOf       Department? @relation("DepartmentHead")
+
+  // Direct reporting line (denormalised shortcut; OrgNode holds the full tree)
+  managerId String?
+  manager   User?   @relation("ReportingLine", fields: [managerId], references: [id], onDelete: SetNull)
+  reports   User[]  @relation("ReportingLine")
+
+  // Defaults used by the attendance engine
+  shiftStart      String  @default("09:00") // HH:mm local
+  shiftEnd        String  @default("18:00")
+  lateGraceMins   Int     @default(15)
+  wfhAllowed      Boolean @default(false)
+  officeLocationId String?
+  officeLocation  OfficeLocation? @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
+
+  // Payroll
+  basicSalary      Float   @default(0) // BDT monthly base salary
+  houseRent        Float   @default(0)
+  medicalAllowance Float   @default(0)
+  transportAllow   Float   @default(0)
+
+  // Relations
+  orgNode          OrgNode?
+  attendanceLogs   AttendanceLog[]
+  leaveRequests    LeaveRequest[]  @relation("LeaveApplicant")
+  leavesApproved   LeaveRequest[]  @relation("LeaveApprover")
+  leavesCovering   LeaveRequest[]  @relation("LeaveSubstitute")
+  tasksAssigned    Task[]          @relation("TaskAssignee")
+  tasksCreated     Task[]          @relation("TaskCreator")
+  tasksBackup      Task[]          @relation("TaskBackup")
+  coverages        TaskCoverage[]  @relation("CoverageSubstitute")
+  qrTokensIssued   QrToken[]
+  extraWork        ExtraWork[]
+  claims           Claim[]
+  payrollMonths    PayrollMonth[]
+  accounts         Account[]
+  sessions         Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+}
+
+// Multi-tier visual hierarchy. Query with a recursive CTE (see notes below).
+model OrgNode {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level    OrgLevel
+  position String? // display title on the tree card
+
+  parentId String?
+  parent   OrgNode?  @relation("OrgTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children OrgNode[] @relation("OrgTree")
+
+  depth     Int     @default(0) // 0 = CEO
+  path      String  @default("") // materialised path "ceoId/dirId/headId" for fast subtree lookups
+  sortOrder Int     @default(0)
+
+  @@index([parentId])
+  @@index([path])
+}
+
+// ───────────────────────────── ATTENDANCE ────────────────────────────
+
+// Geofenced office / site
+model OfficeLocation {
+  id           String  @id @default(cuid())
+  name         String
+  address      String?
+  latitude     Float
+  longitude    Float
+  radiusMeters Int     @default(150) // allowed punch radius
+  isActive     Boolean @default(true)
+
+  users          User[]
+  attendanceLogs AttendanceLog[]
+  qrTokens       QrToken[]
+}
+
+// Rotating QR tokens (shown on lobby screen, refreshed every ~30-60s)
+model QrToken {
+  id         String   @id @default(cuid())
+  token      String   @unique // random, short-lived
+  locationId String?
+  location   OfficeLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  issuedById String?
+  issuedBy   User?    @relation(fields: [issuedById], references: [id], onDelete: SetNull)
+  expiresAt  DateTime
+  usedCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  logs AttendanceLog[]
+
+  @@index([expiresAt])
+}
+
+model AttendanceLog {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  workDate DateTime @db.Date // one row per user per day
+  status   AttendanceStatus @default(PRESENT)
+
+  // Punch in
+  checkInAt     DateTime?
+  checkInSource AttendanceSource?
+  checkInLat    Float?
+  checkInLng    Float?
+  checkInAccuracyM Float?
+  checkInAddress   String? // reverse-geocoded text shown on admin dashboard
+
+  // Punch out
+  checkOutAt     DateTime?
+  checkOutSource AttendanceSource?
+  checkOutLat    Float?
+  checkOutLng    Float?
+  checkOutAddress String?
+
+  workedMinutes Int      @default(0)
+  lateMinutes   Int      @default(0)
+  isWfh         Boolean  @default(false)
+  note          String?
+
+  // Validation + audit
+  locationId   String?
+  location     OfficeLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  qrTokenId    String?
+  qrToken      QrToken?        @relation(fields: [qrTokenId], references: [id], onDelete: SetNull)
+  distanceFromOfficeM Float?
+  deviceId     String? // biometric / RFID / face terminal identifier
+  rawPayload   Json? // hardware payload for future integrations
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, workDate])
+  @@index([workDate, status])
+  @@index([checkInSource])
+}
+
+// ────────────────────────────── LEAVES ───────────────────────────────
+
+model LeaveRequest {
+  id      String      @id @default(cuid())
+  userId  String
+  user    User        @relation("LeaveApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  type    LeaveType
+  status  LeaveStatus @default(PENDING)
+
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  totalDays Float
+  reason    String?
+
+  approverId  String?
+  approver    User?     @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  decidedAt   DateTime?
+  decisionNote String?
+
+  // Handover: default backup for the whole leave period
+  substituteId String?
+  substitute   User?   @relation("LeaveSubstitute", fields: [substituteId], references: [id], onDelete: SetNull)
+
+  coverages TaskCoverage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([startDate, endDate])
+  @@index([status])
+}
+
+// ─────────────────────────────── TASKS ───────────────────────────────
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  progress    Int          @default(0) // 0-100
+  dueDate     DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Standing backup for this task (used when assignee is on leave)
+  backupId String?
+  backup   User?   @relation("TaskBackup", fields: [backupId], references: [id], onDelete: SetNull)
+
+  coverages TaskCoverage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assigneeId, status])
+  @@index([departmentId, status])
+  @@index([dueDate])
+}
+
+// Work Coverage: created when a leave is approved. Dashboard reads active rows
+// to show "Task X → covered by <substitute>" while the assignee is away.
+model TaskCoverage {
+  id            String       @id @default(cuid())
+  taskId        String
+  task          Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  leaveId       String
+  leave         LeaveRequest @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  substituteId  String
+  substitute    User         @relation("CoverageSubstitute", fields: [substituteId], references: [id], onDelete: Cascade)
+
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isActive  Boolean  @default(true)
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, leaveId])
+  @@index([substituteId, isActive])
+  @@index([startDate, endDate])
+}
+
+// ──────────────────────────── IMPLEMENTATION NOTES ────────────────────────────
+//
+// 1) Recursive org tree (Prisma $queryRaw):
+//
+//    WITH RECURSIVE tree AS (
+//      SELECT id, "userId", "parentId", level, position, depth, 0 AS lvl
+//      FROM "OrgNode" WHERE "parentId" IS NULL
+//      UNION ALL
+//      SELECT n.id, n."userId", n."parentId", n.level, n.position, n.depth, t.lvl + 1
+//      FROM "OrgNode" n JOIN tree t ON n."parentId" = t.id
+//    )
+//    SELECT * FROM tree ORDER BY lvl;
+//
+// 2) "Absent" is computed: active users with no AttendanceLog today and no approved
+//    leave covering today. A nightly cron can materialise ABSENT rows.
+//
+// 3) Late = checkInAt > shiftStart + lateGraceMins; set status LATE and lateMinutes.
+//
+// 4) GPS validation: Haversine distance between punch coords and OfficeLocation,
+//    compared to radiusMeters; store distanceFromOfficeM for audit.
+//
+// 5) Future hardware: devices POST { employeeCode, source, deviceId, timestamp }
+//    to /api/attendance/device, authenticated by an API key, reusing the same
+//    AttendanceLog writer with attendanceSource = BIOMETRIC | RFID | FACE.
+
+
+enum ClaimType {
+  MEDICAL
+  TRAVEL
+  EQUIPMENT
+  OTHER
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model ExtraWork {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  hours       Float    @default(0)
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Claim {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        ClaimType
+  amount      Float
+  status      ClaimStatus @default(PENDING)
+  description String?
+  attachmentUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────── CUSTOM WORKFLOW TABLES ───────────────────────
+
+model CustomMovement {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  outTime     String
+  returnTime  String
+  purpose     String
+  destination String
+  vehicle     String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_movements")
+}
+
+model CustomAdvanceSalary {
+  id             String   @id @default(cuid())
+  userId         String
+  amount         Float
+  requestedMonth String
+  reason         String?
+  installments   Int      @default(1)
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_advance_salary")
+}
+
+model CustomOvertime {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  hours     Float
+  project   String?
+  reason    String?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_overtime")
+}
+
+model CustomDocumentRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  docType   String
+  purpose   String?
+  format    String   @default("DIGITAL")
+  status    String   @default("PENDING")
+  remarks   String?
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_document_requests")
+}
+
+model CustomShift {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  shiftName String
+  startTime String
+  endTime   String
+  isWeekend Boolean  @default(false)
+  status    String   @default("SCHEDULED")
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_shifts")
+}
+
+model CustomAsset {
+  id           String   @id @default(cuid())
+  userId       String
+  assetName    String
+  category     String
+  serialNumber String?
+  condition    String   @default("GOOD")
+  assignedDate DateTime @db.Date
+  status       String   @default("ASSIGNED")
+  remarks      String?
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+
+  @@map("custom_assets")
+}
+
+// ──────────────────────── PAYROLL ENGINE ────────────────────────────────
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+model PayrollMonth {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month  String // "YYYY-MM"
+
+  // Salary breakdown
+  basicSalary      Float @default(0)
+  houseRent        Float @default(0)
+  medicalAllowance Float @default(0)
+  transportAllow   Float @default(0)
+  grossSalary      Float @default(0)
+
+  // Attendance counts
+  workingDays  Int @default(0)
+  presentDays  Int @default(0)
+  absentDays   Int @default(0)
+  leaveDays    Int @default(0)
+  lateDays     Int @default(0)
+
+  // Deductions
+  absentDeduction  Float @default(0) // per-day deduction for absences
+  lateDeduction    Float @default(0) // per-late penalty
+  otherDeductions  Float @default(0)
+
+  // Bonuses & Additions
+  overtimeBonus    Float @default(0)
+  festivalBonus    Float @default(0)
+  performanceBonus Float @default(0)
+  otherBonus       Float @default(0)
+
+  // Advance recovery
+  advanceRecovery  Float @default(0) // deducted from payroll
+
+  // Net payable
+  totalAdditions  Float @default(0)
+  totalDeductions Float @default(0)
+  netPayable      Float @default(0)
+
+  status    PayrollStatus @default(DRAFT)
+  paidAt    DateTime?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month])
+  @@index([month, status])
+}

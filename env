@@ -1,0 +1,46 @@
+# PostgreSQL (matches docker-compose.yml). For Supabase paste its connection string here.
+
+<!-- DATABASE_URL="postgresql://postgres:SMTL1234@localhost:5432/attendance?schema=public" -->
+
+DATABASE_URL="postgresql://neondb_owner:npg_ZuMCoHeL56rm@ep-winter-glade-b3dgvv13-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=15&connection_limit=20&pool_timeout=20"
+
+# ─────── AUTHENTICATION ───────
+
+# NextAuth secret — change this in production! Generate one with: openssl rand -base64 32
+
+NEXTAUTH_SECRET="attendance-hub-super-secret-change-in-production-2024"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Demo login fallback: if no session exists, the app acts as this employee.
+
+# Set to empty string to disable demo fallback and force real login.
+
+DEMO_USER_EMAIL="habib@office.test"
+
+# ─────── TIMEZONE ───────
+
+NEXT_PUBLIC_APP_TZ="Asia/Dhaka"
+
+# ─────── DEVICE API ───────
+
+DEVICE_API_KEY="change-me-device-key"
+
+# ─────── OFFICE GEOFENCE (seed) ───────
+
+SEED_OFFICE_LAT="23.7330"
+SEED_OFFICE_LNG="90.4172"
+SEED_OFFICE_RADIUS="200"
+
+# ─────── EMAIL NOTIFICATIONS (SMTP) ───────
+
+# Fill in your email credentials to enable notifications.
+
+# Gmail: use an App Password (not your main password).
+
+# Leave blank to disable email (app will still work — just logs to console).
+
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER=""
+SMTP_PASS=""
