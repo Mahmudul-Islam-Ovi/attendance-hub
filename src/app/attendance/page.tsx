@@ -25,43 +25,49 @@ export default async function AttendancePage() {
   const office = user.officeLocation;
 
   return (
-    <>
+    <div className="w-full max-w-full overflow-hidden sm:overflow-visible">
       <PageTitle title={`Hi ${user.name.split(" ")[0]}`} sub="Punch in with your location or scan the lobby QR code." />
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Glass className="py-5 sm:py-8 lg:col-span-2">
-          <PunchPanel checkIn={mine?.checkInAt?.toISOString() ?? null} checkOut={mine?.checkOutAt?.toISOString() ?? null}
-            wfhAllowed={user.wfhAllowed} officeName={office?.name ?? "the office"} radius={office?.radiusMeters ?? 150} />
-        </Glass>
+      <div className="grid gap-4 lg:grid-cols-5 w-full min-w-0">
+        <div className="w-full flex justify-center lg:col-span-2 min-w-0">
+          <Glass className="w-full max-w-md lg:max-w-none py-6 sm:py-8 px-4 sm:px-6 min-w-0">
+            <PunchPanel checkIn={mine?.checkInAt?.toISOString() ?? null} checkOut={mine?.checkOutAt?.toISOString() ?? null}
+              wfhAllowed={user.wfhAllowed} officeName={office?.name ?? "the office"} radius={office?.radiusMeters ?? 150} />
+          </Glass>
+        </div>
 
-        <div className="space-y-4 lg:col-span-3">
-          <Glass>
-            <h2 className="mb-3 font-semibold">Live check-ins today</h2>
+        <div className="w-full space-y-4 lg:col-span-3 min-w-0">
+          <Glass className="min-w-0 overflow-hidden">
+            <h2 className="mb-3 font-semibold text-slate-900">Live check-ins today</h2>
             {live.length === 0 ? <p className="text-sm text-slate-500">No one has punched in yet.</p> : (
               <ul className="divide-y divide-slate-200/70 text-sm">
                 {live.map((l) => (
-                  <li key={l.id} className="flex items-center gap-3 py-2.5">
+                  <li key={l.id} className="flex items-center justify-between gap-2 sm:gap-3 py-2.5 min-w-0">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{l.user.name} <span className="font-normal text-slate-500">{l.user.department?.name}</span></p>
-                      <p className="truncate text-xs text-slate-500">{l.checkInAddress ?? "No location"}</p>
+                      <p className="truncate font-medium text-xs sm:text-sm text-slate-900">
+                        {l.user.name} <span className="font-normal text-slate-500 text-[11px] sm:text-xs">({l.user.department?.name})</span>
+                      </p>
+                      <p className="truncate text-[11px] sm:text-xs text-slate-500">{l.checkInAddress ?? "No location"}</p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{l.checkInSource}</span>
-                    <span className="w-16 text-right text-xs tabular-nums text-slate-600">{fmtTime(l.checkInAt)}</span>
-                    {l.checkInLat !== null && l.checkInLng !== null ? (
-                      <a href={mapLink(l.checkInLat, l.checkInLng)} target="_blank" rel="noreferrer" aria-label={`Map pin for ${l.user.name}`} className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50"><MapPin className="h-4 w-4" /></a>
-                    ) : <span className="w-8" />}
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-slate-600">{l.checkInSource}</span>
+                      <span className="text-right text-[11px] sm:text-xs tabular-nums text-slate-600 font-medium">{fmtTime(l.checkInAt)}</span>
+                      {l.checkInLat !== null && l.checkInLng !== null ? (
+                        <a href={mapLink(l.checkInLat, l.checkInLng)} target="_blank" rel="noreferrer" aria-label={`Map pin for ${l.user.name}`} className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50"><MapPin className="h-4 w-4" /></a>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </Glass>
 
-          <Glass>
-            <h2 className="mb-3 font-semibold">Your last 7 days</h2>
-            <ul className="divide-y divide-slate-200/70 text-sm">
+          <Glass className="min-w-0 overflow-hidden">
+            <h2 className="mb-3 font-semibold text-slate-900">Your last 7 days</h2>
+            <ul className="divide-y divide-slate-200/70 text-xs sm:text-sm">
               {recent.map((r) => (
-                <li key={r.id} className="flex justify-between py-2">
-                  <span>{new Date(r.workDate).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}</span>
-                  <span className="text-slate-500">{fmtTime(r.checkInAt)} to {fmtTime(r.checkOutAt)} ({r.status.toLowerCase()})</span>
+                <li key={r.id} className="flex items-center justify-between gap-2 py-2 min-w-0">
+                  <span className="font-medium text-slate-700 shrink-0">{new Date(r.workDate).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}</span>
+                  <span className="text-slate-500 text-right truncate">{fmtTime(r.checkInAt)} to {fmtTime(r.checkOutAt)} <span className="capitalize">({r.status.toLowerCase()})</span></span>
                 </li>
               ))}
               {recent.length === 0 && <li className="py-2 text-slate-500">Nothing recorded yet.</li>}
@@ -69,6 +75,6 @@ export default async function AttendancePage() {
           </Glass>
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -51,8 +51,8 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 text-center">
-      <div>
+    <div className="flex w-full flex-col items-center justify-center gap-5 text-center mx-auto">
+      <div className="w-full text-center">
         <p className="text-3xl sm:text-5xl font-bold tabular-nums tracking-tight" suppressHydrationWarning>
           {now ? now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", timeZone: process.env.NEXT_PUBLIC_APP_TZ || "Asia/Dhaka" }) : "--:--:--"}
         </p>
@@ -61,13 +61,13 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
         </p>
       </div>
 
-      <div className="relative grid place-items-center">
+      <div className="relative flex w-full items-center justify-center py-2">
         {!done && !pending && !reduce && (
           <motion.span className={cn("absolute h-40 w-40 sm:h-44 sm:w-44 rounded-full", out ? "bg-rose-400/40" : "bg-indigo-400/40")}
             animate={{ scale: [1, 1.35], opacity: [0.6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }} />
         )}
         <motion.button whileTap={{ scale: 0.95 }} onClick={punchGps} disabled={done || pending}
-          className={cn("relative grid h-40 w-40 sm:h-44 sm:w-44 place-items-center rounded-full text-white shadow-2xl ring-6 sm:ring-8 ring-white/60 disabled:opacity-60",
+          className={cn("relative grid h-40 w-40 sm:h-44 sm:w-44 place-items-center rounded-full text-white shadow-2xl ring-6 sm:ring-8 ring-white/60 disabled:opacity-60 mx-auto",
             done ? "bg-slate-400" : out ? "bg-gradient-to-br from-rose-500 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-violet-600")}>
           <span className="flex flex-col items-center gap-1.5 sm:gap-2">
             {pending ? <Loader2 className="h-8 w-8 sm:h-9 sm:w-9 animate-spin" /> : <MapPin className="h-8 w-8 sm:h-9 sm:w-9" />}
@@ -76,11 +76,11 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
         </motion.button>
       </div>
 
-      <p className="max-w-xs text-xs text-slate-500">Location punch works within {radius} m of {officeName}.</p>
+      <p className="max-w-xs text-xs text-slate-500 mx-auto">Location punch works within {radius} m of {officeName}.</p>
 
-      <div className="flex w-full max-w-sm flex-col gap-2">
+      <div className="flex w-full max-w-xs sm:max-w-sm flex-col gap-2 mx-auto">
         <button onClick={() => setScan(true)} disabled={done || pending}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-white/80 px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white disabled:opacity-50">
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white/80 px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white disabled:opacity-50 active:scale-95 transition">
           <QrCode className="h-4 w-4" /> Scan lobby QR code
         </button>
         {wfhAllowed && !checkIn && (
@@ -92,9 +92,9 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
       </div>
 
       {msg && (
-        <div role="status" className={cn("flex w-full max-w-sm items-start gap-2 rounded-2xl p-3 text-left text-sm", msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>
+        <div role="status" className={cn("flex w-full max-w-xs sm:max-w-sm items-start gap-2 rounded-2xl p-3 text-left text-sm mx-auto", msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>
           {msg.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
-          {msg.text}
+          <span className="break-words">{msg.text}</span>
         </div>
       )}
 
