@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Fingerprint, Eye, EyeOff, Loader2, AlertCircle, LogIn, Lock, Mail } from "lucide-react";
 
 export default function LoginPage() {
@@ -138,10 +139,15 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-slate-400 mt-6">
-          © {new Date().getFullYear()} Attendance Hub. Enterprise HR Management System.
-        </p>
+        {/* Back to Landing Page & Footer */}
+        <div className="mt-6 text-center space-y-2">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition">
+            ← ল্যান্ডিং পেজে ফিরে যান (Back to Home)
+          </Link>
+          <p className="text-center text-xs text-slate-400">
+            © {new Date().getFullYear()} Attendance Hub. Enterprise HR Management System.
+          </p>
+        </div>
       </div>
     </div>
   );

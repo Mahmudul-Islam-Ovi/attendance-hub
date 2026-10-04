@@ -1,10 +1,9 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { Nav } from "@/components/nav";
-import { AutoRefresh } from "@/components/auto-refresh";
 import { AuthProvider } from "@/components/auth-provider";
-import { UserHeader } from "@/components/user-header";
+import { AppShell } from "@/components/app-shell";
+import NextTopLoader from "nextjs-toploader";
 
 const font = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
 
@@ -30,13 +29,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${font.variable} font-sans`}>
+        <NextTopLoader
+          color="#6366f1"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 12px #6366f1, 0 0 6px #818cf8"
+        />
         <AuthProvider>
-          <Nav />
-          <AutoRefresh />
-          <UserHeader />
-          <main className="pt-16 sm:pt-20 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pt-16 lg:pb-10 lg:pl-64 min-h-screen">
-            <div className="mx-auto max-w-7xl px-3 sm:px-6">{children}</div>
-          </main>
+          <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>
     </html>

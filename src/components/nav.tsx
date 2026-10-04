@@ -66,6 +66,8 @@ export function Nav() {
 
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
+  if (!session?.user || path === "/login") return null;
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -256,7 +258,7 @@ export function Nav() {
                   <User className="h-3.5 w-3.5" />
                 </Link>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => signOut({ callbackUrl: "/" })}
                   className="rounded-lg bg-white p-1.5 text-rose-600 shadow-sm border border-rose-100 hover:bg-rose-50 active:scale-95"
                   title="Sign out"
                 >

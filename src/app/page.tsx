@@ -1,7 +1,8 @@
 import { Users, UserCheck, Plane, UserX, Home, CircleCheck, Clock, Percent, AlertTriangle, CalendarClock, ListChecks, ArrowRightLeft, Fingerprint, CalendarRange, Wallet, CheckSquare, MapPin } from "lucide-react";
 import { getDashboard } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
+import { getAuthenticatedUser } from "@/lib/session";
+import { LandingPage } from "@/components/landing-page";
 import { Glass, ProgressBar, PageTitle } from "@/components/ui";
 import { TrendChart } from "@/components/charts";
 import { cn, fmtDate, fmtDay, fmtTime } from "@/lib/utils";
@@ -253,9 +254,9 @@ async function PersonalDashboard({ user }: { user: any }) {
 // MAIN PAGE ROUTER
 // -------------------------------------------------------------
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const user = await getAuthenticatedUser();
   if (!user) {
-    return <div className="p-8 text-center text-rose-500">You must be logged in to view the dashboard.</div>;
+    return <LandingPage />;
   }
 
   const isAdmin = ["SYSTEM_ADMIN", "CEO", "EXECUTIVE_DIRECTOR", "HR_ADMIN"].includes(user.role);

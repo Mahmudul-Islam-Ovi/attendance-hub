@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "./prisma";
 
-/** Gets the currently logged-in user from NextAuth session, or falls back to DEMO_USER_EMAIL for backwards compatibility. */
-export async function getCurrentUser() {
+/** Gets the authenticated user strictly from NextAuth session (null if guest/logged out) */
+export async function getAuthenticatedUser() {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.email) {
@@ -13,9 +13,17 @@ export async function getCurrentUser() {
       });
     }
   } catch {
-    // getServerSession can fail in some contexts (e.g., API routes called outside Next.js request context)
+    // getServerSession failed
   }
-  // Fallback: demo mode
+  return null;
+}
+
+/** Gets the currently logged-in user from NextAuth session, or falls back to DEMO_USER_EMAIL for backwards compatibility. */
+export async function getCurrentUser() {
+  const authUser = await getAuthenticatedUser();
+  if (authUser) return authUser;
+  
+  // If explicitly configured for demo bypass:
   const email = process.env.DEMO_USER_EMAIL;
   if (!email) return null;
   return prisma.user.findUnique({ where: { email }, include: { department: true, officeLocation: true } });

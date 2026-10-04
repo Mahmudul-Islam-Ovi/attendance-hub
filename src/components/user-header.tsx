@@ -90,7 +90,7 @@ export function UserHeader() {
                   My Profile
                 </Link>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => signOut({ callbackUrl: "/" })}
                   className="w-full flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition"
                 >
                   <LogOut className="h-4 w-4" />
