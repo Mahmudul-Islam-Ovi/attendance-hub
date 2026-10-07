@@ -6,7 +6,7 @@ import { distanceMeters } from "./geo";
 export type PunchInput = {
   userId: string; source: AttendanceSource; lat?: number; lng?: number; accuracy?: number;
   locationId?: string | null; qrTokenId?: string | null; deviceId?: string | null;
-  wfh?: boolean; raw?: unknown; at?: Date;
+  wfh?: boolean; raw?: unknown; at?: Date; address?: string;
 };
 export type PunchResult =
   | { ok: true; action: "CHECK_IN" | "CHECK_OUT"; status: AttendanceStatus; message: string }
@@ -30,7 +30,7 @@ export async function recordPunch(i: PunchInput): Promise<PunchResult> {
 
   if (wfh) {
     if (!user.wfhAllowed) return { ok: false, error: "Work from home is not enabled for your account." };
-    address = "Work from home";
+    address = i.address?.trim() || "Work from home";
   } else if (i.source === "GPS") {
     if (i.lat === undefined || i.lng === undefined) return { ok: false, error: "Location missing. Allow location access and retry." };
     if (!loc) return { ok: false, error: "No office location is configured. Ask an admin to add one." };
@@ -39,7 +39,9 @@ export async function recordPunch(i: PunchInput): Promise<PunchResult> {
     if (distance > allowed) {
       isPendingApproval = true;
     }
-    address = `${loc.name} (${Math.round(distance)} m from entrance)`;
+    address = i.address?.trim() || `${loc.name} (${Math.round(distance)} m from entrance)`;
+  } else if (i.address) {
+    address = i.address.trim();
   } else if (loc) {
     address = loc.name;
   }
