@@ -76,7 +76,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
           _isDoneForDay = data['isDoneForDay'] == true;
           _isPendingApproval = data['isPendingApproval'] == true || data['status'] == 'PENDING_APPROVAL';
 
-          final inStr = data['checkInAt'];
+          final inStr = data['checkInAt'] ?? (data['log'] is Map ? data['log']['checkInAt'] : null);
           if (inStr != null && inStr.toString().isNotEmpty) {
             try {
               final dt = DateTime.parse(inStr.toString()).toLocal();
@@ -86,7 +86,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
             }
           }
 
-          final outStr = data['checkOutAt'];
+          final outStr = data['checkOutAt'] ?? (data['log'] is Map ? data['log']['checkOutAt'] : null);
           if (outStr != null && outStr.toString().isNotEmpty) {
             try {
               final dt = DateTime.parse(outStr.toString()).toLocal();
@@ -454,12 +454,14 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       _statusMsg = null;
     });
 
+    final targetAction = _isPunchedIn ? 'CHECK_OUT' : 'CHECK_IN';
     final res = await _attendance.punchWithGps(
       userId: user.id,
       employeeCode: user.employeeCode,
       isWfh: _isWfh,
       position: position,
       address: address,
+      action: targetAction,
     );
 
     if (mounted) {

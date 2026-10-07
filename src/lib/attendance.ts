@@ -6,7 +6,7 @@ import { distanceMeters } from "./geo";
 export type PunchInput = {
   userId: string; source: AttendanceSource; lat?: number; lng?: number; accuracy?: number;
   locationId?: string | null; qrTokenId?: string | null; deviceId?: string | null;
-  wfh?: boolean; raw?: unknown; at?: Date; address?: string;
+  wfh?: boolean; raw?: unknown; at?: Date; address?: string; action?: "CHECK_IN" | "CHECK_OUT";
 };
 export type PunchResult =
   | { ok: true; action: "CHECK_IN" | "CHECK_OUT"; status: AttendanceStatus; message: string }
@@ -54,7 +54,20 @@ export async function recordPunch(i: PunchInput): Promise<PunchResult> {
   const existing = await prisma.attendanceLog.findUnique({ where: { userId_workDate: { userId: user.id, workDate } } });
   const common = { lat: i.lat ?? null, lng: i.lng ?? null };
 
+  if (i.action === "CHECK_IN" && existing?.checkInAt) {
+    return { ok: false, error: "আজকের পাঞ্চ ইন ইতোমধ্যে সম্পন্ন হয়েছে।" };
+  }
+  if (i.action === "CHECK_OUT" && (!existing || !existing.checkInAt)) {
+    return { ok: false, error: "পাঞ্চ আউট করার পূর্বে পাঞ্চ ইন সম্পন্ন করুন।" };
+  }
+  if (i.action === "CHECK_OUT" && existing?.checkOutAt) {
+    return { ok: false, error: "আজকের পাঞ্চ আউট ইতোমধ্যে সম্পন্ন হয়েছে।" };
+  }
+
   if (!existing || !existing.checkInAt) {
+    if (i.action === "CHECK_OUT") {
+      return { ok: false, error: "পাঞ্চ আউট করার পূর্বে পাঞ্চ ইন সম্পন্ন করুন।" };
+    }
     const status: AttendanceStatus = isPendingApproval ? "PENDING_APPROVAL" : (wfh ? "WFH" : isLate ? "LATE" : "PRESENT");
     const data = {
       status, isWfh: wfh, checkInAt: now, checkInSource: i.source,

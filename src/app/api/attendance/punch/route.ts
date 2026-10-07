@@ -78,6 +78,10 @@ export async function GET(req: Request) {
       isDoneForDay,
       isPendingApproval,
       status: log?.status ?? null,
+      checkInAt: log?.checkInAt?.toISOString() ?? null,
+      checkOutAt: log?.checkOutAt?.toISOString() ?? null,
+      checkInAddress: log?.checkInAddress ?? null,
+      checkOutAddress: log?.checkOutAddress ?? null,
       liveCheckins: liveLogs.map((l) => ({
         id: l.id,
         userId: l.userId,
@@ -112,7 +116,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { userId, employeeCode, source, lat, lng, accuracy, address, isWfh, token } = body;
+    const { userId, employeeCode, source, lat, lng, accuracy, address, isWfh, token, action } = body;
 
     let user = null;
     if (userId) {
@@ -143,6 +147,20 @@ export async function POST(req: Request) {
       );
     }
 
+    if (action === "CHECK_IN" && existing?.checkInAt) {
+      return NextResponse.json(
+        { ok: false, error: "আজকের পাঞ্চ ইন ইতোমধ্যে সম্পন্ন হয়েছে।" },
+        { status: 400 }
+      );
+    }
+
+    if (action === "CHECK_OUT" && (!existing || !existing.checkInAt)) {
+      return NextResponse.json(
+        { ok: false, error: "পাঞ্চ আউট করার পূর্বে পাঞ্চ ইন সম্পন্ন করুন।" },
+        { status: 400 }
+      );
+    }
+
     let qrTokenId: string | undefined;
     let qrLocationId: string | undefined;
 
@@ -169,6 +187,7 @@ export async function POST(req: Request) {
       accuracy: typeof accuracy === "number" ? accuracy : undefined,
       address: typeof address === "string" ? address : undefined,
       wfh: !!isWfh,
+      action: action === "CHECK_OUT" ? "CHECK_OUT" : (action === "CHECK_IN" ? "CHECK_IN" : undefined),
       qrTokenId,
       locationId: qrLocationId,
     });

@@ -156,6 +156,7 @@ class AttendanceService {
     required bool isWfh,
     Position? position,
     String? address,
+    String? action,
   }) async {
     Position? pos = position;
     if (!isWfh && pos == null) {
@@ -190,6 +191,7 @@ class AttendanceService {
         'employeeCode': employeeCode,
         'source': 'GPS',
         'isWfh': isWfh,
+        if (action != null) 'action': action,
         if (pos != null) 'lat': pos.latitude,
         if (pos != null) 'lng': pos.longitude,
         if (pos != null) 'accuracy': pos.accuracy,
@@ -231,6 +233,23 @@ class AttendanceService {
       );
     }
 
+    if (action == 'CHECK_IN' && alreadyPunchedIn) {
+      return PunchResult(
+        ok: false,
+        message: 'আজকের পাঞ্চ ইন ইতোমধ্যে সম্পন্ন হয়েছে।',
+        hasPunchedIn: true,
+        hasPunchedOut: currentStatus['hasPunchedOut'] == true,
+        isDoneForDay: alreadyDoneForDay,
+      );
+    }
+
+    if (action == 'CHECK_OUT' && !alreadyPunchedIn) {
+      return PunchResult(
+        ok: false,
+        message: 'পাঞ্চ আউট করার পূর্বে পাঞ্চ ইন সম্পন্ন করুন।',
+      );
+    }
+
     final bool isOutOfBounds =
         !isWfh && distance != null && distance > AppConfig.officeRadiusMeters;
     final now = DateTime.now();
@@ -244,7 +263,9 @@ class AttendanceService {
                 ? 'Out of bounds (${distance.round()}m from office)'
                 : 'Office HQ'));
 
-    if (!alreadyPunchedIn) {
+    final bool doCheckIn = action == 'CHECK_IN' || (action == null && !alreadyPunchedIn);
+
+    if (doCheckIn) {
       // CHECK IN
       final String status = isOutOfBounds
           ? 'PENDING_APPROVAL'

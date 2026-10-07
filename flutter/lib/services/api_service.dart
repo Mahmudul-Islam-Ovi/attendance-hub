@@ -15,8 +15,10 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     _sessionCookie = prefs.getString('session_cookie');
     final savedUrl = prefs.getString('custom_base_url');
-    if (savedUrl != null && savedUrl.isNotEmpty) {
+    if (savedUrl != null && savedUrl.isNotEmpty && !savedUrl.contains('localhost')) {
       AppConfig.baseUrl = savedUrl;
+    } else {
+      AppConfig.baseUrl = AppConfig.defaultBaseUrl;
     }
   }
 
@@ -61,7 +63,7 @@ class ApiService {
     final url = Uri.parse('${AppConfig.baseUrl}$path');
     try {
       final res = await http.get(url, headers: _buildHeaders(headers)).timeout(
-            const Duration(seconds: 4),
+            const Duration(seconds: 15),
           );
       _extractCookies(res);
       return res;
@@ -83,7 +85,7 @@ class ApiService {
             headers: _buildHeaders(headers),
             body: body != null ? jsonEncode(body) : null,
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       _extractCookies(res);
       return res;
     } catch (_) {
@@ -104,7 +106,7 @@ class ApiService {
             headers: _buildHeaders(headers),
             body: body != null ? jsonEncode(body) : null,
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       _extractCookies(res);
       return res;
     } catch (_) {
@@ -117,7 +119,7 @@ class ApiService {
     try {
       final res = await http
           .delete(url, headers: _buildHeaders(headers))
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 15));
       _extractCookies(res);
       return res;
     } catch (_) {
