@@ -3,8 +3,28 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import bcrypt from "bcryptjs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const email = searchParams.get("email");
+    const userId = searchParams.get("userId");
+
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { department: true, officeLocation: true },
+      });
+      if (user) return NextResponse.json(user);
+    }
+
+    if (email) {
+      const user = await prisma.user.findFirst({
+        where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+        include: { department: true, officeLocation: true },
+      });
+      if (user) return NextResponse.json(user);
+    }
+
     let user = await getCurrentUser();
     if (!user) {
       user = await prisma.user.findFirst({

@@ -88,7 +88,7 @@ class AttendanceHubApp extends StatelessWidget {
             }
 
             if (auth.isAuthenticated) {
-              return const MainNavigationScreen();
+              return MainNavigationScreen(key: ValueKey(auth.user?.id));
             }
 
             return const LoginScreen();

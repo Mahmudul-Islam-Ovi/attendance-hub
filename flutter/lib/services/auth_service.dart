@@ -30,37 +30,28 @@ class AuthService {
     final cleanEmail = email.trim().toLowerCase();
 
     try {
-      // 1. First try logging in through NextAuth CSRF / Credentials flow or API
-      final csrfRes = await _api.get('/api/auth/csrf');
-      String? csrfToken;
-      if (csrfRes.statusCode == 200) {
-        final csrfData = jsonDecode(csrfRes.body);
-        csrfToken = csrfData['csrfToken'];
-      }
-
-      final body = {
+      // 1. Direct REST Authentication for mobile & web apps
+      final res = await _api.post('/api/auth/login', body: {
         'email': cleanEmail,
         'password': password,
-        'redirect': 'false',
-        'json': 'true',
-        if (csrfToken != null) 'csrfToken': csrfToken,
-      };
-
-      final res = await _api.post('/api/auth/callback/credentials', body: body);
+      });
 
       if (res.statusCode == 200) {
-        // Fetch fresh user profile
-        final meRes = await _api.get('/api/me');
-        if (meRes.statusCode == 200) {
-          final meJson = jsonDecode(meRes.body);
-          if (meJson != null && meJson['id'] != null) {
-            final user = UserModel.fromJson(meJson);
-            await saveUser(user);
-            return user;
-          }
+        final data = jsonDecode(res.body);
+        if (data != null && data['user'] != null) {
+          final user = UserModel.fromJson(data['user']);
+          await saveUser(user);
+          return user;
         }
+      } else if (res.statusCode == 401 || res.statusCode == 403) {
+        final data = jsonDecode(res.body);
+        final err = data['error'] ?? 'ইমেইল বা পাসওয়ার্ড সঠিক নয়।';
+        throw Exception(err);
       }
     } catch (e) {
+      if (e.toString().contains('সঠিক নয়') || e.toString().contains('inactive') || e.toString().contains('Invalid')) {
+        rethrow;
+      }
       debugPrint('Online login attempt failed: $e. Checking offline demo users...');
     }
 
