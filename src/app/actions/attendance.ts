@@ -10,10 +10,10 @@ function refresh() {
   revalidatePath("/"); revalidatePath("/attendance"); revalidatePath("/employees"); revalidatePath("/departments"); revalidatePath("/org");
 }
 
-export async function punchWithGps(input: { lat: number; lng: number; accuracy?: number; wfh?: boolean }): Promise<PunchResult> {
+export async function punchWithGps(input: { lat: number; lng: number; accuracy?: number; wfh?: boolean; address?: string }): Promise<PunchResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "No signed-in employee. Check DEMO_USER_EMAIL and run the seed." };
-  const r = await recordPunch({ userId: user.id, source: "GPS", lat: input.lat, lng: input.lng, accuracy: input.accuracy, wfh: input.wfh });
+  const r = await recordPunch({ userId: user.id, source: "GPS", lat: input.lat, lng: input.lng, accuracy: input.accuracy, wfh: input.wfh, address: input.address });
   if (r.ok) refresh();
   return r;
 }

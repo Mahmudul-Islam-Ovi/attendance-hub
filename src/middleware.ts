@@ -5,11 +5,11 @@ import type { NextRequest } from "next/server";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public paths: root landing page (/), login, api/auth, static assets
+  // Public paths: root landing page (/), login, API endpoints, static assets
   if (
     pathname === "/" ||
     pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/public") ||
     pathname === "/favicon.ico"
@@ -35,6 +35,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
   ],
 };
