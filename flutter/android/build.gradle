@@ -3,6 +3,11 @@ allprojects {
         google()
         mavenCentral()
     }
+    afterEvaluate { project ->
+        project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+            enabled = false
+        }
+    }
 }
 
 rootProject.buildDir = '../build'

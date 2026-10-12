@@ -13,7 +13,9 @@ class AuthService {
     if (userStr != null) {
       try {
         final map = jsonDecode(userStr);
-        return UserModel.fromJson(map);
+        final user = UserModel.fromJson(map);
+        await _api.setAuthUser(email: user.email, id: user.id);
+        return user;
       } catch (e) {
         debugPrint('Error parsing cached user: $e');
       }
@@ -24,6 +26,7 @@ class AuthService {
   Future<void> saveUser(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cached_user', jsonEncode(user.toJson()));
+    await _api.setAuthUser(email: user.email, id: user.id);
   }
 
   Future<UserModel?> login(String email, String password) async {
@@ -105,6 +108,7 @@ class AuthService {
     try {
       await _api.post('/api/auth/signout');
     } catch (_) {}
+    await _api.setAuthUser(email: null, id: null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_user');
     await prefs.remove('session_cookie');

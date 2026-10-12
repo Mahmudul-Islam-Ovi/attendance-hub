@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
 import '../models/department_model.dart';
+import '../providers/auth_provider.dart';
 import '../services/workflow_service.dart';
 import '../widgets/glass_container.dart';
 
@@ -85,6 +87,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
 
     setState(() => _loading = true);
 
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final currentU = auth.currentUser;
+
     final payload = {
       'name': _nameCtrl.text.trim(),
       'email': _emailCtrl.text.trim().toLowerCase(),
@@ -100,6 +105,8 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       'medicalAllowance': double.tryParse(_medicalCtrl.text.trim()) ?? 0,
       'transportAllow': double.tryParse(_transportCtrl.text.trim()) ?? 0,
       'password': _passwordCtrl.text.trim(),
+      if (currentU != null) 'currentUserEmail': currentU.email,
+      if (currentU != null) 'currentUserId': currentU.id,
     };
 
     final result = await _workflow.addEmployee(payload);

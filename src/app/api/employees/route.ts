@@ -15,12 +15,31 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || !["SYSTEM_ADMIN", "CEO", "EXECUTIVE_DIRECTOR", "HR_ADMIN"].includes(currentUser.role)) {
+    const body = await req.json();
+
+    const allowedRoles = ["SYSTEM_ADMIN", "CEO", "EXECUTIVE_DIRECTOR", "HR_ADMIN", "SUPER_ADMIN", "ADMIN", "HR"];
+    const callerEmail = req.headers.get("x-user-email") || body.currentUserEmail || body.adminEmail;
+    const callerId = req.headers.get("x-user-id") || body.currentUserId || body.adminId;
+
+    let currentUser = await getCurrentUser(req);
+    if ((!currentUser || !allowedRoles.includes(currentUser.role)) && (callerEmail || callerId)) {
+      if (callerId) {
+        currentUser = await prisma.user.findUnique({
+          where: { id: callerId },
+          include: { department: true, officeLocation: true },
+        });
+      } else if (callerEmail) {
+        currentUser = await prisma.user.findFirst({
+          where: { email: { equals: String(callerEmail).trim().toLowerCase(), mode: "insensitive" } },
+          include: { department: true, officeLocation: true },
+        });
+      }
+    }
+
+    if (!currentUser || !allowedRoles.includes(currentUser.role)) {
       return NextResponse.json({ error: "Unauthorized. Only Admins or HR can add employees." }, { status: 403 });
     }
 
-    const body = await req.json();
     const { 
       name, email, phone, designation, level, role, 
       departmentId, managerId, officeLocationId, wfhAllowed,

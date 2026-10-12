@@ -129,13 +129,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Brand Icon
+                    // Brand Logo
                     Container(
-                      height: 64,
-                      width: 64,
+                      height: 72,
+                      width: 72,
                       decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primary.withOpacity(0.35),
@@ -144,10 +143,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.fingerprint,
-                        color: Colors.white,
-                        size: 38,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            decoration: const BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                            ),
+                            child: const Icon(Icons.fingerprint, color: Colors.white, size: 38),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -331,13 +338,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
-                    TextButton.icon(
-                      onPressed: _showServerSettings,
-                      icon: const Icon(Icons.settings, size: 16, color: AppColors.textMuted),
-                      label: Text(
-                        'Server Settings (${AppConfig.baseUrl})',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Attendance Hub • v1.0.1',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],

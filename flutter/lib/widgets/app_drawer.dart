@@ -32,10 +32,9 @@ class AppDrawer extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    height: 40,
-                    width: 40,
+                    height: 42,
+                    width: 42,
                     decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -45,7 +44,14 @@ class AppDrawer extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.fingerprint, color: Colors.white, size: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.fingerprint, color: Colors.white, size: 24),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(

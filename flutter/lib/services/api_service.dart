@@ -10,15 +10,35 @@ class ApiService {
   ApiService._internal();
 
   String? _sessionCookie;
+  String? _userEmail;
+  String? _userId;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _sessionCookie = prefs.getString('session_cookie');
+    _userEmail = prefs.getString('auth_user_email');
+    _userId = prefs.getString('auth_user_id');
     final savedUrl = prefs.getString('custom_base_url');
     if (savedUrl != null && savedUrl.isNotEmpty && !savedUrl.contains('localhost')) {
       AppConfig.baseUrl = savedUrl;
     } else {
       AppConfig.baseUrl = AppConfig.defaultBaseUrl;
+    }
+  }
+
+  Future<void> setAuthUser({String? email, String? id}) async {
+    _userEmail = email;
+    _userId = id;
+    final prefs = await SharedPreferences.getInstance();
+    if (email != null && email.isNotEmpty) {
+      await prefs.setString('auth_user_email', email);
+    } else {
+      await prefs.remove('auth_user_email');
+    }
+    if (id != null && id.isNotEmpty) {
+      await prefs.setString('auth_user_id', id);
+    } else {
+      await prefs.remove('auth_user_id');
     }
   }
 
@@ -43,6 +63,12 @@ class ApiService {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
+    if (_userEmail != null && _userEmail!.isNotEmpty) {
+      headers['x-user-email'] = _userEmail!;
+    }
+    if (_userId != null && _userId!.isNotEmpty) {
+      headers['x-user-id'] = _userId!;
+    }
     if (_sessionCookie != null && _sessionCookie!.isNotEmpty) {
       headers['Cookie'] = _sessionCookie!;
     }
