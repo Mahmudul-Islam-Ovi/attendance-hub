@@ -83,16 +83,19 @@ class _OrgTreeScreenState extends State<OrgTreeScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Organisation Tree', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          const Text('Multi-tier company hierarchy from CEO to employee levels.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-          const SizedBox(height: 16),
-          ..._roots.map((r) => _buildNode(r, 0)),
-        ],
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Organisation Tree', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const Text('Multi-tier company hierarchy from CEO to employee levels.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            const SizedBox(height: 16),
+            ..._roots.map((r) => _buildNode(r, 0)),
+          ],
+        ),
       ),
     );
   }

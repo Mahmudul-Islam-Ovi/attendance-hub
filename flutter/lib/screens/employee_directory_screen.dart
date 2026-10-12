@@ -251,7 +251,9 @@ class _EmployeeDirectoryScreenState extends State<EmployeeDirectoryScreen> {
               },
             )
           : null,
-      body: Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
           // Search & Filters Header
           Container(
@@ -333,6 +335,7 @@ class _EmployeeDirectoryScreenState extends State<EmployeeDirectoryScreen> {
                   ),
           ),
         ],
+      ),
       ),
     );
   }

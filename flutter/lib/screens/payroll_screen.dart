@@ -42,9 +42,11 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Month Selector
@@ -208,6 +210,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
           ],
         ],
       ),
+    ),
     );
   }
 

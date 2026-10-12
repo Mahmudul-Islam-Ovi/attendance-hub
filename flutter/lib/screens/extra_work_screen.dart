@@ -116,7 +116,9 @@ class _ExtraWorkScreenState extends State<ExtraWorkScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Log Extra Work', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,6 +185,7 @@ class _ExtraWorkScreenState extends State<ExtraWorkScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

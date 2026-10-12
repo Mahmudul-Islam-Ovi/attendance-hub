@@ -206,7 +206,9 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Claim', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         child: Column(
           children: [
@@ -305,6 +307,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

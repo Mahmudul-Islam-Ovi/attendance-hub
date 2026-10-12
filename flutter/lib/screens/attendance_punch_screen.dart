@@ -597,9 +597,11 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
             ? const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)])
             : (_isPunchedIn ? AppColors.punchOutGradient : AppColors.primaryGradient));
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
         children: [
           // Digital Clock & Status Caption
           Text(
@@ -888,6 +890,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
           const SizedBox(height: 20),
         ],
       ),
+    ),
     );
   }
 }

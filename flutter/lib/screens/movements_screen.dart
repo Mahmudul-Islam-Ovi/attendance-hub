@@ -167,7 +167,9 @@ class _MovementsScreenState extends State<MovementsScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Pass', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,6 +305,7 @@ class _MovementsScreenState extends State<MovementsScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

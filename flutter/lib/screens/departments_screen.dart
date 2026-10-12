@@ -37,9 +37,11 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Teams & Departments', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
@@ -109,6 +111,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

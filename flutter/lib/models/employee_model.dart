@@ -71,7 +71,13 @@ class EmployeeModel {
       email: json['email'] ?? '',
       phone: json['phone'],
       employeeCode: json['employeeCode'] ?? '',
-      avatarUrl: json['avatarUrl'],
+      avatarUrl: (json['avatarUrl'] != null && json['avatarUrl'].toString().isNotEmpty)
+          ? json['avatarUrl'].toString()
+          : (json['image'] != null && json['image'].toString().isNotEmpty)
+              ? json['image'].toString()
+              : (json['photo'] != null && json['photo'].toString().isNotEmpty)
+                  ? json['photo'].toString()
+                  : 'https://i.pravatar.cc/150?u=${Uri.encodeComponent(json['name'] ?? json['employeeCode'] ?? 'emp')}',
       designation: json['designation'],
       level: json['level'] ?? 'EMPLOYEE',
       dept: json['dept'],

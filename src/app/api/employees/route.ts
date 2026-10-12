@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { getEmployees } from "@/lib/data";
 import bcrypt from "bcryptjs";
+
+export async function GET() {
+  try {
+    const list = await getEmployees();
+    return NextResponse.json(list);
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {

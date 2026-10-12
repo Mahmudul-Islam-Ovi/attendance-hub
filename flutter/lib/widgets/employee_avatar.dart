@@ -59,10 +59,12 @@ class EmployeeAvatar extends StatelessWidget {
         } catch (_) {}
       }
 
-      // 2. Relative upload URL (/uploads/...)
-      String fullUrl = url;
-      if (url.startsWith('/')) {
-        fullUrl = '${AppConfig.baseUrl}$url';
+      // 2. Relative upload URL (/uploads/...) or relative path
+      String fullUrl = url.trim();
+      if (fullUrl.startsWith('/')) {
+        fullUrl = '${AppConfig.baseUrl}$fullUrl';
+      } else if (!fullUrl.startsWith('http') && !fullUrl.startsWith('data:')) {
+        fullUrl = '${AppConfig.baseUrl}/$fullUrl';
       }
 
       // 3. Network URL
@@ -74,6 +76,10 @@ class EmployeeAvatar extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return _buildFallback();
+            },
             errorBuilder: (_, __, ___) => _buildFallback(),
           ),
         );

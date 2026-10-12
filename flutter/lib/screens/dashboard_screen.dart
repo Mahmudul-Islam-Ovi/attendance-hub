@@ -114,9 +114,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final dateStr = DateFormat('EEEE, d MMMM yyyy').format(DateTime.now());
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: SingleChildScrollView(
+    return SafeArea(
+      bottom: false,
+      child: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
@@ -218,6 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

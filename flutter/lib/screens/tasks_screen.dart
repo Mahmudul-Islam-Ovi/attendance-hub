@@ -129,7 +129,9 @@ class _TasksScreenState extends State<TasksScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Task', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
           // Filter Chips
           Container(
@@ -240,6 +242,7 @@ class _TasksScreenState extends State<TasksScreen> {
                   ),
           ),
         ],
+      ),
       ),
     );
   }

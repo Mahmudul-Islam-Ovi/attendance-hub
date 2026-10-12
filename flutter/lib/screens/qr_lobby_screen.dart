@@ -46,8 +46,10 @@ class _QrLobbyScreenState extends State<QrLobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
+    return SafeArea(
+      bottom: false,
+      child: Center(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -105,6 +107,7 @@ class _QrLobbyScreenState extends State<QrLobbyScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
