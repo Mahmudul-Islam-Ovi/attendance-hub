@@ -35,6 +35,17 @@ async function checkAdmin(req: Request, body?: any) {
   return currentUser;
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-email, x-user-id, Accept",
+    },
+  });
+}
+
 export async function GET() {
   try {
     const offices = await prisma.officeLocation.findMany({

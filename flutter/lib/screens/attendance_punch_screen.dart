@@ -796,9 +796,9 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'GPS punch validates presence within 200m of Main Office HQ.',
-            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+          Text(
+            'GPS punch validates presence within ${user?.officeLocationRadius ?? 200}m of ${user?.officeLocationName ?? "Head Office"}.',
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),

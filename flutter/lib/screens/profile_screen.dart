@@ -477,6 +477,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildInfoRow('Employee Code', user?.employeeCode ?? 'EMP-0001'),
+                  _buildInfoRow('Office Location', '${user?.officeLocationName ?? "Head Office"} (±${user?.officeLocationRadius ?? 200}m)'),
                   _buildInfoRow('Department', user?.departmentName ?? 'General'),
                   _buildInfoRow('Designation', user?.designation ?? 'Staff'),
                   _buildInfoRow('System Role', user?.role ?? 'EMPLOYEE'),
