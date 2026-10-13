@@ -38,24 +38,23 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   bool _loading = false;
   bool _initialDataLoading = true;
 
-  final List<String> _levels = [
-    'EMPLOYEE',
-    'OFFICER',
-    'MANAGER',
-    'LEAD',
-    'HEAD',
-    'DIRECTOR',
-    'CXO',
+  final List<Map<String, String>> _levels = const [
+    {'value': 'EMPLOYEE', 'label': 'Employee'},
+    {'value': 'TEAM_LEAD', 'label': 'Team Lead'},
+    {'value': 'MANAGER', 'label': 'Manager'},
+    {'value': 'DEPT_HEAD', 'label': 'Dept Head'},
+    {'value': 'DIRECTOR', 'label': 'Director'},
+    {'value': 'CEO', 'label': 'CEO'},
   ];
 
-  final List<String> _roles = [
-    'EMPLOYEE',
-    'MANAGER',
-    'HR',
-    'ADMIN',
-    'HR_ADMIN',
-    'CEO',
-    'SYSTEM_ADMIN',
+  final List<Map<String, String>> _roles = const [
+    {'value': 'EMPLOYEE', 'label': 'Employee (EMPLOYEE)'},
+    {'value': 'MANAGER', 'label': 'Manager (MANAGER)'},
+    {'value': 'HR_ADMIN', 'label': 'HR Admin (HR_ADMIN)'},
+    {'value': 'DIRECTOR', 'label': 'Director (DIRECTOR)'},
+    {'value': 'EXECUTIVE_DIRECTOR', 'label': 'Executive Director (EXECUTIVE_DIRECTOR)'},
+    {'value': 'CEO', 'label': 'CEO (CEO)'},
+    {'value': 'SYSTEM_ADMIN', 'label': 'System Admin (SYSTEM_ADMIN)'},
   ];
 
   @override
@@ -246,8 +245,8 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                               Expanded(
                                 child: DropdownButtonFormField<String>(
                                   value: _level,
-                                  decoration: const InputDecoration(labelText: 'Job Level'),
-                                  items: _levels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                                  decoration: const InputDecoration(labelText: 'Org Level *'),
+                                  items: _levels.map((l) => DropdownMenuItem(value: l['value']!, child: Text(l['label']!))).toList(),
                                   onChanged: (v) => setState(() => _level = v ?? 'EMPLOYEE'),
                                 ),
                               ),
@@ -255,8 +254,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                               Expanded(
                                 child: DropdownButtonFormField<String>(
                                   value: _role,
-                                  decoration: const InputDecoration(labelText: 'System Role'),
-                                  items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                                  decoration: const InputDecoration(labelText: 'System Role *'),
+                                  isExpanded: true,
+                                  items: _roles.map((r) => DropdownMenuItem(value: r['value']!, child: Text(r['label']!, overflow: TextOverflow.ellipsis))).toList(),
                                   onChanged: (v) => setState(() => _role = v ?? 'EMPLOYEE'),
                                 ),
                               ),

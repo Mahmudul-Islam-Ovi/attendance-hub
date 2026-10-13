@@ -49,9 +49,25 @@ export async function POST(req: Request) {
       password, avatarUrl: providedAvatar
     } = body;
 
-    if (!name || !email || !level || !role) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!name || !email) {
+      return NextResponse.json({ error: "Missing required fields (name, email)" }, { status: 400 });
     }
+
+    // Defensive validation & mapping for OrgLevel enum
+    const validLevels = ["CEO", "DIRECTOR", "DEPT_HEAD", "MANAGER", "TEAM_LEAD", "EMPLOYEE"];
+    let finalLevel: any = String(level || "EMPLOYEE").trim().toUpperCase();
+    if (finalLevel === "OFFICER") finalLevel = "EMPLOYEE";
+    else if (finalLevel === "LEAD") finalLevel = "TEAM_LEAD";
+    else if (finalLevel === "HEAD") finalLevel = "DEPT_HEAD";
+    else if (finalLevel === "CXO") finalLevel = "CEO";
+    else if (!validLevels.includes(finalLevel)) finalLevel = "EMPLOYEE";
+
+    // Defensive validation & mapping for SystemRole enum
+    const validRoles = ["SYSTEM_ADMIN", "CEO", "EXECUTIVE_DIRECTOR", "DIRECTOR", "HR_ADMIN", "MANAGER", "EMPLOYEE", "SUPER_ADMIN", "ADMIN", "HR"];
+    let finalRole: any = String(role || "EMPLOYEE").trim().toUpperCase();
+    if (finalRole === "ADMIN") finalRole = "HR_ADMIN";
+    else if (finalRole === "HR") finalRole = "HR_ADMIN";
+    else if (!validRoles.includes(finalRole)) finalRole = "EMPLOYEE";
 
     // Generate next employee code
     const count = await prisma.user.count();
@@ -70,8 +86,8 @@ export async function POST(req: Request) {
         email: email.toLowerCase(),
         phone: phone || null,
         designation: designation || null,
-        level,
-        role,
+        level: finalLevel,
+        role: finalRole,
         departmentId: departmentId || null,
         managerId: managerId || null,
         officeLocationId: officeLocationId || null,
@@ -98,7 +114,7 @@ export async function POST(req: Request) {
     const node = await prisma.orgNode.create({
       data: {
         userId: newUser.id,
-        level,
+        level: finalLevel,
         position: designation,
         depth,
         sortOrder: count,
