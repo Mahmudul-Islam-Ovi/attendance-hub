@@ -119,32 +119,6 @@ export async function GET(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const { id, logId, status, note } = body;
-    const targetId = id || logId;
-    if (!targetId) return NextResponse.json({ ok: false, error: "ID required" }, { status: 400 });
-
-    const log = await prisma.attendanceLog.update({
-      where: { id: targetId },
-      data: {
-        ...(status ? { status } : {}),
-        ...(note ? { note: `[Approved by Admin] ${note}` } : {}),
-      },
-      include: { user: true },
-    });
-
-    return NextResponse.json({ ok: true, log }, {
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-      },
-    });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));

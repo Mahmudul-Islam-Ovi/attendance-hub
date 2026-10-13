@@ -62,9 +62,10 @@ export default function MyJobCardPage() {
 
   const handleDownloadPDF = async () => {
     if (!data) return;
-    const { jsPDF } = await import("jspdf");
+    const jsPdfModule = await import("jspdf");
+    const JsPdfClass = (jsPdfModule as any).default || (jsPdfModule as any).jsPDF || (jsPdfModule as any);
     const autoTable = (await import("jspdf-autotable")).default;
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const doc = new JsPdfClass({ orientation: "landscape", unit: "mm", format: "a4" });
     doc.setFillColor(30, 41, 59);
     doc.rect(0, 0, 297, 30, "F");
     doc.setTextColor(255, 255, 255);

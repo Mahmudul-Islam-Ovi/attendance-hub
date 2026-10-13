@@ -112,9 +112,10 @@ export default function PayrollPage() {
 
   const handleDownloadPDF = async () => {
     if (!data) return;
-    const { jsPDF } = await import("jspdf");
+    const jsPdfModule = await import("jspdf");
+    const JsPdfClass = (jsPdfModule as any).default || (jsPdfModule as any).jsPDF || (jsPdfModule as any);
     const autoTable = (await import("jspdf-autotable")).default;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const doc = new JsPdfClass({ orientation: "portrait", unit: "mm", format: "a4" });
 
     doc.setFillColor(79, 70, 229);
     doc.rect(0, 0, 210, 40, "F");
