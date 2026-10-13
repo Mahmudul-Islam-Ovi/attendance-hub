@@ -416,6 +416,8 @@ class _OfficeFormBottomSheetState extends State<_OfficeFormBottomSheet> {
 
       final latDouble = position.latitude;
       final lngDouble = position.longitude;
+      final lat = latDouble.toStringAsFixed(6);
+      final lng = lngDouble.toStringAsFixed(6);
 
       _latCtrl.text = lat;
       _lngCtrl.text = lng;
