@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
@@ -172,11 +174,27 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       _statusMsg = null;
     });
 
-    // 1. Fetch current GPS position and location details
-    final locDetails = await _attendance.getLocationDetails();
+    // 1. Fetch current GPS position and location details with dynamic office params
+    final locDetails = await _attendance.getLocationDetails(
+      officeLat: user.officeLocationLat,
+      officeLng: user.officeLocationLng,
+      officeRadius: user.officeLocationRadius,
+      officeName: user.officeLocationName,
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
+
+    // Anti-spoofing check
+    if (locDetails?['isMocked'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ভুয়া জিপিএস (Fake GPS / Mock Location) শনাক্ত হয়েছে! আপনি হাজিরা দিতে পারবেন না।'),
+          backgroundColor: AppColors.absent,
+        ),
+      );
+      return;
+    }
 
     if (locDetails == null && !_isWfh) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +206,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       return;
     }
 
-    // 2. Open confirmation popup with address and submit button
+    // 2. Open confirmation popup with read-only map and address
     _showPunchConfirmationModal(locDetails);
   }
 
@@ -207,6 +225,12 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
 
     final double? distance = locDetails?['distance'];
     final bool isOutOfBounds = locDetails?['isOutOfBounds'] == true;
+
+    final double empLat = (locDetails?['latitude'] as num?)?.toDouble() ?? 23.7330;
+    final double empLng = (locDetails?['longitude'] as num?)?.toDouble() ?? 90.4172;
+    final double offLat = (locDetails?['officeLat'] as num?)?.toDouble() ?? 23.7330;
+    final double offLng = (locDetails?['officeLng'] as num?)?.toDouble() ?? 90.4172;
+    final double offRadius = (locDetails?['officeRadius'] as num?)?.toDouble() ?? 200.0;
 
     final isLate = !_isWfh && (now.hour > 9 || (now.hour == 9 && now.minute > 15));
     final String projectedStatus = _isWfh
@@ -327,6 +351,141 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
                 ),
               ),
               const SizedBox(height: 12),
+
+              // Read-Only Live GPS Map
+              if (!_isWfh) ...[
+                Container(
+                  height: 165,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isOutOfBounds ? AppColors.leave.withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        options: MapOptions(
+                          initialCenter: LatLng(empLat, empLng),
+                          initialZoom: 16.0,
+                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.attendancehub.app',
+                          ),
+                          // Office Geofence Circle
+                          CircleLayer(
+                            circles: [
+                              CircleMarker(
+                                point: LatLng(offLat, offLng),
+                                color: (isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.18),
+                                borderColor: isOutOfBounds ? AppColors.leave : AppColors.present,
+                                borderStrokeWidth: 2,
+                                radius: offRadius,
+                                useRadiusInMeter: true,
+                              ),
+                            ],
+                          ),
+                          // Markers
+                          MarkerLayer(
+                            markers: [
+                              // Office Building Marker
+                              Marker(
+                                point: LatLng(offLat, offLng),
+                                width: 34,
+                                height: 34,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                  ),
+                                  child: const Icon(Icons.business, color: Colors.white, size: 20),
+                                ),
+                              ),
+                              // Employee Live Location Marker (Read-Only)
+                              Marker(
+                                point: LatLng(empLat, empLng),
+                                width: 34,
+                                height: 34,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isOutOfBounds ? AppColors.leave : AppColors.present,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // Top Status Badge
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isOutOfBounds ? Icons.cancel : Icons.check_circle,
+                                size: 14,
+                                color: isOutOfBounds ? AppColors.leave : AppColors.present,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isOutOfBounds
+                                    ? 'সীমানার বাইরে (${distance?.round() ?? 0}m)'
+                                    : 'সীমানার ভেতরে (${distance?.round() ?? 0}m)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isOutOfBounds ? AppColors.leaveText : AppColors.present,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 6,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            '🔒 Locked Live GPS',
+                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // Location Address Card (Prominent & Clear)
               Container(

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../models/office_location_model.dart';
@@ -323,6 +325,45 @@ class _OfficeFormBottomSheetState extends State<_OfficeFormBottomSheet> {
     _isActive = o?.isActive ?? true;
   }
 
+  final MapController _mapController = MapController();
+  bool _addressLoading = false;
+
+  Future<void> _reverseGeocode(double lat, double lng) async {
+    setState(() => _addressLoading = true);
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
+      );
+      final res = await http.get(url, headers: {'User-Agent': 'AttendanceHubApp/1.0'}).timeout(
+        const Duration(seconds: 4),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['display_name'] != null) {
+          final parts = (data['display_name'] as String).split(',');
+          final shortAddr = parts.length > 4 ? parts.take(4).join(',').trim() : (data['display_name'] as String).trim();
+          if (mounted) {
+            setState(() {
+              _addressCtrl.text = shortAddr;
+            });
+          }
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _addressLoading = false);
+    }
+  }
+
+  void _onMapTapped(TapPosition tapPosition, LatLng point) {
+    setState(() {
+      _latCtrl.text = point.latitude.toStringAsFixed(6);
+      _lngCtrl.text = point.longitude.toStringAsFixed(6);
+      _gpsMessage = 'Location picked: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
+    });
+    _reverseGeocode(point.latitude, point.longitude);
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose;
@@ -373,11 +414,14 @@ class _OfficeFormBottomSheetState extends State<_OfficeFormBottomSheet> {
         timeLimit: const Duration(seconds: 12),
       );
 
-      final lat = position.latitude.toStringAsFixed(6);
-      final lng = position.longitude.toStringAsFixed(6);
+      final latDouble = position.latitude;
+      final lngDouble = position.longitude;
 
       _latCtrl.text = lat;
       _lngCtrl.text = lng;
+
+      // Pan map to detected coordinates
+      _mapController.move(LatLng(latDouble, lngDouble), 16.5);
 
       // Try reverse geocoding via OpenStreetMap Nominatim
       try {
@@ -545,11 +589,101 @@ class _OfficeFormBottomSheetState extends State<_OfficeFormBottomSheet> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: _gpsMessage!.contains('Captured') ? AppColors.present : Colors.orange[800],
+                          color: _gpsMessage!.contains('Captured') || _gpsMessage!.contains('picked') ? AppColors.present : Colors.orange[800],
                         ),
                       ),
                     ],
                     const SizedBox(height: 12),
+
+                    // Interactive OpenStreetMap Location Picker
+                    Builder(
+                      builder: (context) {
+                        final currentLat = double.tryParse(_latCtrl.text.trim()) ?? 23.7330;
+                        final currentLng = double.tryParse(_lngCtrl.text.trim()) ?? 90.4172;
+
+                        return Container(
+                          height: 210,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            children: [
+                              FlutterMap(
+                                mapController: _mapController,
+                                options: MapOptions(
+                                  initialCenter: LatLng(currentLat, currentLng),
+                                  initialZoom: 16.0,
+                                  onTap: _onMapTapped,
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    userAgentPackageName: 'com.attendancehub.app',
+                                  ),
+                                  CircleLayer(
+                                    circles: [
+                                      CircleMarker(
+                                        point: LatLng(currentLat, currentLng),
+                                        color: AppColors.primary.withValues(alpha: 0.18),
+                                        borderColor: AppColors.primary,
+                                        borderStrokeWidth: 2,
+                                        radius: _radiusMeters.toDouble(),
+                                        useRadiusInMeter: true,
+                                      ),
+                                    ],
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: LatLng(currentLat, currentLng),
+                                        width: 38,
+                                        height: 38,
+                                        child: const Icon(Icons.location_on, color: AppColors.primary, size: 36),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Positioned(
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.72),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.touch_app, size: 14, color: Colors.white70),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'ম্যাপে ট্যাপ করে পিন বসান',
+                                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                      ),
+                                      if (_addressLoading) ...[
+                                        const SizedBox(width: 8),
+                                        const SizedBox(
+                                          width: 10,
+                                          height: 10,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
                     Row(
                       children: [
                         Expanded(

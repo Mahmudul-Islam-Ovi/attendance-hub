@@ -31,7 +31,8 @@ export default async function AttendancePage() {
         <div className="w-full flex justify-center lg:col-span-2 min-w-0">
           <Glass className="w-full max-w-md lg:max-w-none py-6 sm:py-8 px-4 sm:px-6 min-w-0">
             <PunchPanel checkIn={mine?.checkInAt?.toISOString() ?? null} checkOut={mine?.checkOutAt?.toISOString() ?? null}
-              wfhAllowed={user.wfhAllowed} officeName={office?.name ?? "the office"} radius={office?.radiusMeters ?? 150} />
+              wfhAllowed={user.wfhAllowed} officeName={office?.name ?? "the office"} radius={office?.radiusMeters ?? 150}
+              officeLat={office?.latitude ?? 23.7330} officeLng={office?.longitude ?? 90.4172} />
           </Glass>
         </div>
 

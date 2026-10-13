@@ -5,11 +5,30 @@ import { MapPin, QrCode, Loader2, CheckCircle2, AlertTriangle, Home } from "luci
 import { punchWithGps, punchWithQr } from "@/app/actions/attendance";
 import { Modal } from "./modal";
 import { QrScanner } from "./qr-scanner";
+import dynamic from "next/dynamic";
 import { fmtTime, cn } from "@/lib/utils";
 
-type Props = { checkIn: string | null; checkOut: string | null; wfhAllowed: boolean; officeName: string; radius: number };
+const LivePunchMap = dynamic(() => import("./live-punch-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-44 w-full rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
+      <Loader2 className="w-4 h-4 animate-spin mr-2 text-indigo-600" />
+      Loading Map View...
+    </div>
+  ),
+});
 
-export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }: Props) {
+type Props = {
+  checkIn: string | null;
+  checkOut: string | null;
+  wfhAllowed: boolean;
+  officeName: string;
+  radius: number;
+  officeLat?: number;
+  officeLng?: number;
+};
+
+export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius, officeLat = 23.7330, officeLng = 90.4172 }: Props) {
   const [now, setNow] = useState<Date | null>(null);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -154,6 +173,27 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
               </span>
             </div>
 
+            {/* Live Read-Only Map View */}
+            {!wfh && (
+              <div>
+                <LivePunchMap
+                  employeeLat={confirmData.pos.coords.latitude}
+                  employeeLng={confirmData.pos.coords.longitude}
+                  officeLat={officeLat}
+                  officeLng={officeLng}
+                  officeRadius={radius}
+                  officeName={officeName}
+                  isInside={
+                    Math.hypot(
+                      (confirmData.pos.coords.latitude - officeLat) * 111000,
+                      (confirmData.pos.coords.longitude - officeLng) * 111000 * Math.cos((officeLat * Math.PI) / 180)
+                    ) <= radius
+                  }
+                  height="180px"
+                />
+              </div>
+            )}
+
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3.5 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
                 <MapPin className="h-4 w-4" /> বর্তমান লোকেশন / ঠিকানা:
@@ -161,8 +201,18 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius }
               <p className="text-xs font-semibold text-slate-800 leading-relaxed">
                 {confirmData.address}
               </p>
-              <div className="text-[11px] text-slate-500 font-medium">
-                {wfh ? "Work From Home (WFH মোড)" : `Coordinates: ${confirmData.pos.coords.latitude.toFixed(4)}, ${confirmData.pos.coords.longitude.toFixed(4)}`}
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>{wfh ? "Work From Home (WFH মোড)" : `GPS: ${confirmData.pos.coords.latitude.toFixed(4)}, ${confirmData.pos.coords.longitude.toFixed(4)}`}</span>
+                {!wfh && (
+                  <span className="text-slate-600 font-semibold">
+                    দূরত্ব: {Math.round(
+                      Math.hypot(
+                        (confirmData.pos.coords.latitude - officeLat) * 111000,
+                        (confirmData.pos.coords.longitude - officeLng) * 111000 * Math.cos((officeLat * Math.PI) / 180)
+                      )
+                    )}m
+                  </span>
+                )}
               </div>
             </div>
 

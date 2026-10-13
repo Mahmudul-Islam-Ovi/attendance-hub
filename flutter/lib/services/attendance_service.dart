@@ -80,15 +80,25 @@ class AttendanceService {
     return '${AppConfig.officeName} Area (Out of bounds - ${d.round()}m)';
   }
 
-  Future<Map<String, dynamic>?> getLocationDetails() async {
+  Future<Map<String, dynamic>?> getLocationDetails({
+    double? officeLat,
+    double? officeLng,
+    int? officeRadius,
+    String? officeName,
+  }) async {
     final pos = await getCurrentPosition();
     if (pos == null) return null;
+
+    final targetLat = officeLat ?? AppConfig.officeLat;
+    final targetLng = officeLng ?? AppConfig.officeLng;
+    final targetRadius = (officeRadius ?? AppConfig.officeRadiusMeters.toInt()).toDouble();
+    final targetName = officeName ?? AppConfig.officeName;
 
     final distance = distanceMeters(
       pos.latitude,
       pos.longitude,
-      AppConfig.officeLat,
-      AppConfig.officeLng,
+      targetLat,
+      targetLng,
     );
 
     final address = await getAddressFromCoordinates(pos.latitude, pos.longitude);
@@ -99,8 +109,13 @@ class AttendanceService {
       'longitude': pos.longitude,
       'accuracy': pos.accuracy,
       'distance': distance,
-      'isOutOfBounds': distance > AppConfig.officeRadiusMeters,
+      'isOutOfBounds': distance > targetRadius,
       'address': address,
+      'isMocked': pos.isMocked,
+      'officeLat': targetLat,
+      'officeLng': targetLng,
+      'officeRadius': targetRadius,
+      'officeName': targetName,
     };
   }
 

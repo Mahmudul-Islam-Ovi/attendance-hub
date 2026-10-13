@@ -18,5 +18,5 @@ class AppConfig {
   static const double officeLat = 23.7330;
   static const double officeLng = 90.4172;
   static const double officeRadiusMeters = 200.0;
-  static const String officeName = 'Main Office HQ';
+  static const String officeName = 'Head Office';
 }

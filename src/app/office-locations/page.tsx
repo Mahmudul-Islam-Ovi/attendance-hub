@@ -21,6 +21,17 @@ import {
   X,
 } from "lucide-react";
 import { PageTitle, Glass } from "@/components/ui";
+import dynamic from "next/dynamic";
+
+const MapPicker = dynamic(() => import("@/components/map-picker"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-80 w-full rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-medium">
+      <Loader2 className="w-5 h-5 animate-spin mr-2 text-indigo-600" />
+      Loading OpenStreetMap...
+    </div>
+  ),
+});
 
 interface Office {
   id: string;
@@ -336,10 +347,10 @@ export default function OfficeLocationsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                      GPS Coordinates (Latitude & Longitude)
+                      Interactive Map Location Picker (OpenStreetMap)
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      অফিসে বসে এক ক্লিকে বর্তমান জিপিএস লোকেশন সেট করতে পাশের বাটনে ক্লিক করুন
+                      ম্যাপে যেকোনো জায়গায় ক্লিক করুন অথবা পিন ড্র্যাগ করুন। অথবা "Auto-Detect" চাপুন।
                     </p>
                   </div>
                   <button
@@ -351,6 +362,24 @@ export default function OfficeLocationsPage() {
                     {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
                     {locating ? "Detecting GPS..." : "📍 Auto-Detect My Current GPS"}
                   </button>
+                </div>
+
+                {/* OpenStreetMap Interactive Picker */}
+                <div className="pt-1">
+                  <MapPicker
+                    latitude={parseFloat(formData.latitude) || 23.7330}
+                    longitude={parseFloat(formData.longitude) || 90.4172}
+                    radiusMeters={formData.radiusMeters}
+                    onChange={({ latitude, longitude, address }) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        latitude: latitude.toFixed(6),
+                        longitude: longitude.toFixed(6),
+                        ...(address ? { address } : {}),
+                      }));
+                    }}
+                    height="320px"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
