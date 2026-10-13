@@ -26,6 +26,7 @@ import 'job_card_screen.dart';
 import 'claim_report_screen.dart';
 import 'qr_lobby_screen.dart';
 import 'profile_screen.dart';
+import 'office_locations_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -127,6 +128,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const ClaimReportScreen(), // 18 (Claim Report & summary)
       const QrLobbyScreen(), // 19
       const ProfileScreen(), // 20
+      const OfficeLocationsScreen(), // 21
     ];
   }
 

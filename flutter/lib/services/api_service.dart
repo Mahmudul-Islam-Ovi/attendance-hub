@@ -140,6 +140,27 @@ class ApiService {
     }
   }
 
+  Future<http.Response> put(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final url = Uri.parse('${AppConfig.baseUrl}$path');
+    try {
+      final res = await http
+          .put(
+            url,
+            headers: _buildHeaders(headers),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 15));
+      _extractCookies(res);
+      return res;
+    } catch (_) {
+      rethrow;
+    }
+  }
+
   Future<http.Response> delete(String path, {Map<String, String>? headers}) async {
     final url = Uri.parse('${AppConfig.baseUrl}$path');
     try {

@@ -5,6 +5,7 @@ import '../models/department_model.dart';
 import '../models/org_node_model.dart';
 import '../models/workflow_models.dart';
 import '../models/payroll_model.dart';
+import '../models/office_location_model.dart';
 import 'api_service.dart';
 
 class WorkflowService {
@@ -793,6 +794,44 @@ class WorkflowService {
       }
     } catch (_) {}
     return [];
+  }
+
+  // ----------------- OFFICE LOCATIONS & GEOFENCE -----------------
+  Future<List<OfficeLocationModel>> getOffices() async {
+    try {
+      final res = await _api.get('/api/offices');
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        return list.map((e) => OfficeLocationModel.fromJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<Map<String, dynamic>> saveOffice(Map<String, dynamic> data) async {
+    try {
+      final isEdit = data.containsKey('id') && data['id'] != null && data['id'].toString().isNotEmpty;
+      final res = isEdit
+          ? await _api.put('/api/offices', body: data)
+          : await _api.post('/api/offices', body: data);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return {'ok': true, 'data': jsonDecode(res.body)};
+      } else {
+        final err = jsonDecode(res.body);
+        return {'ok': false, 'error': err['error'] ?? 'Failed to save office location'};
+      }
+    } catch (e) {
+      return {'ok': false, 'error': e.toString()};
+    }
+  }
+
+  Future<bool> deleteOffice(String id) async {
+    try {
+      final res = await _api.delete('/api/offices?id=$id');
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

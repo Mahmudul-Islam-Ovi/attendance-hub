@@ -233,6 +233,13 @@ export default function AddEmployeePage() {
                 {managers.map(m => <option key={m.id} value={m.id}>{m.name} ({m.employeeCode})</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Office Location</label>
+              <select name="officeLocationId" value={form.officeLocationId} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                <option value="">-- Default Head Office --</option>
+                {offices.map(o => <option key={o.id} value={o.id}>{o.name} ({o.radiusMeters}m)</option>)}
+              </select>
+            </div>
             <div className="flex items-center gap-2 pt-6">
               <input type="checkbox" id="wfhAllowed" name="wfhAllowed" checked={form.wfhAllowed} onChange={handleChange} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" />
               <label htmlFor="wfhAllowed" className="text-sm font-semibold text-slate-700">Work From Home (WFH) allowed?</label>

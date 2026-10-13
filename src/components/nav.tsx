@@ -8,7 +8,7 @@ import {
   ShieldCheck, CalendarPlus, CheckSquare, Compass, Receipt, Banknote,
   SunMedium, Hourglass, FileCheck, CalendarRange, UserCheck, CreditCard,
   Contact2, FileSpreadsheet, Laptop, Menu, X, ChevronRight, Wallet, UserPlus,
-  User, LogOut
+  User, LogOut, MapPin
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ const sections = [
       { href: "/attendance", label: "Punch Attendance", icon: Fingerprint, primary: true },
       { href: "/employees", label: "People Directory", icon: Users },
       { href: "/add-employee", label: "Add Employee", icon: UserPlus, adminOnly: true },
+      { href: "/office-locations", label: "Office Locations", icon: MapPin, adminOnly: true },
       { href: "/departments", label: "Teams", icon: Building2 },
       { href: "/org", label: "Org Tree", icon: Network },
     ],
