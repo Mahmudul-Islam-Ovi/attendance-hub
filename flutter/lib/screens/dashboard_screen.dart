@@ -12,6 +12,7 @@ import '../services/attendance_service.dart';
 import '../services/workflow_service.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/status_badge.dart';
+import 'add_employee_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int screenIndex) onNavigate;
@@ -216,6 +217,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             if (isAdmin) ...[
               _buildAdminMetrics(),
+              const SizedBox(height: 14),
+              _buildAdminQuickActions(),
               const SizedBox(height: 16),
               _buildDepartmentProgress(),
               const SizedBox(height: 16),
@@ -259,6 +262,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _buildMetricTile('Absent', '$absent', Icons.person_off_outlined, AppColors.absent, AppColors.absentBg),
         _buildMetricTile('Work From Home', '$wfh', Icons.home_work_outlined, AppColors.wfh, AppColors.wfhBg),
         _buildMetricTile('Attendance Rate', '$rate%', Icons.percent, AppColors.violet, AppColors.violet.withOpacity(0.1)),
+      ],
+    );
+  }
+
+  Widget _buildAdminQuickActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.person_add_alt_1, size: 18),
+            label: const Text('Add Employee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddEmployeeScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.violet,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+            label: const Text('Add Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: () => widget.onNavigate(21),
+          ),
+        ),
       ],
     );
   }

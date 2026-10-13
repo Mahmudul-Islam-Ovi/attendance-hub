@@ -157,8 +157,7 @@ class AppDrawer extends StatelessWidget {
                   _buildItem(2, 'People Directory', Icons.people_outline),
                   _buildItem(3, 'Teams & Departments', Icons.business_outlined),
                   _buildItem(4, 'Org Tree', Icons.account_tree_outlined),
-                  if (isAdmin)
-                    _buildItem(21, 'Office Locations', Icons.location_on_outlined),
+                  _buildItem(21, 'Office Locations (Add Location)', Icons.add_location_alt_outlined, isPrimary: true),
 
                   const SizedBox(height: 12),
                   _buildSectionHeader('WORKFLOW & REQUESTS'),
