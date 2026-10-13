@@ -43,8 +43,15 @@ class UserModel {
         'SUPER_ADMIN',
         'ADMIN',
         'HR',
-        'MANAGER',
       ].contains(role);
+
+  bool get isManager => [
+        'MANAGER',
+        'DIRECTOR',
+        'DEPT_HEAD',
+      ].contains(role) || isAdmin;
+
+  bool get canAddEmployee => isAdmin;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     String? deptName;

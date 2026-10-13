@@ -21,19 +21,21 @@ export async function POST(req: Request) {
     const callerEmail = req.headers.get("x-user-email") || body.currentUserEmail || body.adminEmail;
     const callerId = req.headers.get("x-user-id") || body.currentUserId || body.adminId;
 
-    let currentUser = await getCurrentUser(req);
-    if ((!currentUser || !allowedRoles.includes(currentUser.role)) && (callerEmail || callerId)) {
-      if (callerId) {
-        currentUser = await prisma.user.findUnique({
-          where: { id: callerId },
-          include: { department: true, officeLocation: true },
-        });
-      } else if (callerEmail) {
-        currentUser = await prisma.user.findFirst({
-          where: { email: { equals: String(callerEmail).trim().toLowerCase(), mode: "insensitive" } },
-          include: { department: true, officeLocation: true },
-        });
-      }
+    let currentUser: any = null;
+    if (callerId) {
+      currentUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { department: true, officeLocation: true },
+      });
+    } else if (callerEmail) {
+      currentUser = await prisma.user.findFirst({
+        where: { email: { equals: String(callerEmail).trim().toLowerCase(), mode: "insensitive" } },
+        include: { department: true, officeLocation: true },
+      });
+    }
+
+    if (!currentUser) {
+      currentUser = await getCurrentUser(req);
     }
 
     if (!currentUser || !allowedRoles.includes(currentUser.role)) {
