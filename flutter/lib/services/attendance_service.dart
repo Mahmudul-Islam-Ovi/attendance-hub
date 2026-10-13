@@ -115,9 +115,12 @@ class AttendanceService {
     final cacheKey = 'today_punch_${userKey}_$todayKey';
 
     try {
-      final query = userId != null
-          ? '?userId=$userId'
-          : (employeeCode != null ? '?employeeCode=$employeeCode' : '');
+      final List<String> params = [];
+      if (userId != null) params.add('userId=$userId');
+      if (employeeCode != null) params.add('employeeCode=$employeeCode');
+      params.add('_t=${DateTime.now().millisecondsSinceEpoch}');
+      final query = '?${params.join('&')}';
+
       final res = await _api.get('/api/attendance/punch$query');
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);

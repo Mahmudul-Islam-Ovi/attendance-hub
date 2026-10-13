@@ -271,7 +271,7 @@ class WorkflowService {
   // ----------------- MOVEMENTS -----------------
   Future<List<MovementItem>> getMovements() async {
     try {
-      final res = await _api.get('/api/movements');
+      final res = await _api.get('/api/movements?_t=${DateTime.now().millisecondsSinceEpoch}');
       if (res.statusCode == 200) {
         final List list = jsonDecode(res.body);
         return list.map((m) => MovementItem.fromJson(m)).toList();
@@ -340,7 +340,7 @@ class WorkflowService {
   // ----------------- CLAIMS -----------------
   Future<List<ClaimItem>> getClaims() async {
     try {
-      final res = await _api.get('/api/claim');
+      final res = await _api.get('/api/claim?_t=${DateTime.now().millisecondsSinceEpoch}');
       if (res.statusCode == 200) {
         final List list = jsonDecode(res.body);
         return list.map((c) => ClaimItem.fromJson(c)).toList();

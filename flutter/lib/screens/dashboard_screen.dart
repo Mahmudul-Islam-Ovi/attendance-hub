@@ -31,15 +31,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<TaskModel> _tasks = [];
   List<AttendanceLog> _pendingPunches = [];
   Map<String, dynamic>? _myTodayPunch;
+  Timer? _liveSyncTimer;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _liveSyncTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _loadData(silent: true);
+    });
   }
 
-  Future<void> _loadData() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _liveSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final user = auth.user;

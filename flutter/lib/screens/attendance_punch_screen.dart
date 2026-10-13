@@ -22,6 +22,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
   final AttendanceService _attendance = AttendanceService();
 
   late Timer _clockTimer;
+  Timer? _liveSyncTimer;
   DateTime _currentTime = DateTime.now();
   late AnimationController _pulseController;
 
@@ -50,16 +51,22 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
     )..repeat(reverse: true);
 
     _loadData();
+
+    // Instant real-time live sync every 2 seconds
+    _liveSyncTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) _loadData(silent: true);
+    });
   }
 
   @override
   void dispose() {
     _clockTimer.cancel();
+    _liveSyncTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool silent = false}) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.user;
     if (user == null) return;
@@ -71,10 +78,37 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       );
 
       if (mounted) {
+        final wasPending = _isPendingApproval;
+        final newIsPunchedIn = data['hasPunchedIn'] == true;
+        final newIsDoneForDay = data['isDoneForDay'] == true;
+        final newIsPendingApproval = data['isPendingApproval'] == true || data['status'] == 'PENDING_APPROVAL';
+
+        // Detect if admin just approved it in real-time
+        if (wasPending && !newIsPendingApproval && newIsPunchedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'অভিনন্দন! অ্যাডমিন আপনার পাঞ্চ অনুমোদন করেছেন। স্ট্যাটাস আপডেট হয়েছে।',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.present,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+
         setState(() {
-          _isPunchedIn = data['hasPunchedIn'] == true;
-          _isDoneForDay = data['isDoneForDay'] == true;
-          _isPendingApproval = data['isPendingApproval'] == true || data['status'] == 'PENDING_APPROVAL';
+          _isPunchedIn = newIsPunchedIn;
+          _isDoneForDay = newIsDoneForDay;
+          _isPendingApproval = newIsPendingApproval;
 
           final inStr = data['checkInAt'] ?? (data['log'] is Map ? data['log']['checkInAt'] : null);
           if (inStr != null && inStr.toString().isNotEmpty) {

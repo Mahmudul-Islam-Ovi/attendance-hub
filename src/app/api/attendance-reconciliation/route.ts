@@ -37,7 +37,13 @@ export async function GET(req: Request) {
       take: 100,
     });
 
-    return NextResponse.json(logs);
+    return NextResponse.json(logs, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

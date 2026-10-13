@@ -35,14 +35,25 @@ class _AttendanceReconciliationScreenState extends State<AttendanceReconciliatio
     'WFH',
   ];
 
+  Timer? _liveSyncTimer;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _liveSyncTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) _loadData(silent: true);
+    });
   }
 
-  Future<void> _loadData() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _liveSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     final dateStr = _selectedDate != null ? DateFormat('yyyy-MM-dd').format(_selectedDate!) : null;
     final futures = await Future.wait([
       _attendance.getReconciliationLogs(
