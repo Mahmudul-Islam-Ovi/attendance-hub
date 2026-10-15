@@ -506,21 +506,47 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
-                          size: 20,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'বর্তমান লোকেশন / ঠিকানা:',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'বর্তমান লোকেশন / ঠিকানা:',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
+                        if (locDetails?['accuracy'] != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: ((locDetails!['accuracy'] as num).toDouble() <= 30
+                                      ? AppColors.present
+                                      : AppColors.leave)
+                                  .withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'GPS: ±${(locDetails['accuracy'] as num).round()}m',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: (locDetails['accuracy'] as num).toDouble() <= 30
+                                    ? AppColors.present
+                                    : AppColors.leaveText,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),

@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { PageTitle, Glass } from "@/components/ui";
+import { getAccurateCurrentPosition } from "@/lib/gps-client";
 import dynamic from "next/dynamic";
 
 const MapPicker = dynamic(() => import("@/components/map-picker"), {
@@ -85,51 +86,34 @@ export default function OfficeLocationsPage() {
     fetchOffices();
   }, []);
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
-
+  const handleGetCurrentLocation = async () => {
     setLocating(true);
     setError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lng = pos.coords.longitude.toFixed(6);
-        setFormData((prev) => ({
-          ...prev,
-          latitude: lat,
-          longitude: lng,
-        }));
+    try {
+      const res = await getAccurateCurrentPosition({
+        desiredAccuracy: 20,
+        maxWaitTimeMs: 6000,
+        timeoutMs: 12000,
+        reverseGeocode: true,
+      });
 
-        // Try reverse geocoding via OpenStreetMap Nominatim
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.display_name && !formData.address) {
-              setFormData((prev) => ({
-                ...prev,
-                address: data.display_name.split(",").slice(0, 3).join(","),
-              }));
-            }
-          }
-        } catch (_) {}
+      const lat = res.latitude.toFixed(6);
+      const lng = res.longitude.toFixed(6);
+      setFormData((prev) => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        address: prev.address || res.address || "",
+      }));
 
-        setLocating(false);
-        setSuccess("বর্তমান GPS লোকেশন সফলভাবে পাওয়া গেছে!");
-        setTimeout(() => setSuccess(null), 3000);
-      },
-      (err) => {
-        setLocating(false);
-        setError(`GPS Error: ${err.message}. Please allow location access in your browser.`);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      setSuccess(`বর্তমান GPS লোকেশন সফলভাবে পাওয়া গেছে! (Precision: ±${Math.round(res.accuracy)}m)`);
+      setTimeout(() => setSuccess(null), 3500);
+    } catch (err: any) {
+      setError(err?.message || "GPS লোকেশন পেতে সমস্যা হয়েছে। অনুগ্রহ করে জিপিএস চালু করুন।");
+    } finally {
+      setLocating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

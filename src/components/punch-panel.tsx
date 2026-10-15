@@ -7,6 +7,8 @@ import { Modal } from "./modal";
 import { QrScanner } from "./qr-scanner";
 import dynamic from "next/dynamic";
 import { fmtTime, cn } from "@/lib/utils";
+import { distanceMeters } from "@/lib/geo";
+import { getAccurateCurrentPosition } from "@/lib/gps-client";
 
 const LivePunchMap = dynamic(() => import("./live-punch-map"), {
   ssr: false,
@@ -44,61 +46,81 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius, 
 
   const [confirmData, setConfirmData] = useState<{
     pos: GeolocationPosition;
+    latitude: number;
+    longitude: number;
+    accuracy: number;
     address: string;
+    distance: number;
+    isInside: boolean;
+    isHighPrecision: boolean;
   } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
+  const [gpsProgressMsg, setGpsProgressMsg] = useState<string | null>(null);
 
   const done = !!checkOut;
   const out = !!checkIn && !checkOut;
   const label = done ? "Done for today" : out ? "Punch out" : "Punch in";
 
-  function punchGps() {
+  async function punchGps() {
     setMsg(null);
-    if (!navigator.geolocation) return setMsg({ ok: false, text: "This browser has no location support." });
     setLocLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        let addr = wfh
-          ? "Work From Home"
-          : `Office Premise (Lat: ${pos.coords.latitude.toFixed(4)}, Lon: ${pos.coords.longitude.toFixed(4)})`;
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=18&addressdetails=1`
-          );
-          if (res.ok) {
-            const d = await res.json();
-            if (d.display_name) {
-              const parts = d.display_name.split(",");
-              addr = parts.length > 3 ? parts.slice(0, 4).join(",").trim() : d.display_name;
-            }
-          }
-        } catch (_) {}
-        setLocLoading(false);
-        setConfirmData({ pos, address: addr });
-      },
-      (err) => {
-        setLocLoading(false);
-        setMsg({
-          ok: false,
-          text:
-            err.code === 1
-              ? "Location permission denied. Allow location access and try again."
-              : "Could not read your location. Move to an open area and retry.",
-        });
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+    setGpsProgressMsg("GPS স্যাটেলাইট সিগন্যাল অনুসন্ধান করা হচ্ছে...");
+
+    try {
+      const result = await getAccurateCurrentPosition({
+        desiredAccuracy: 25, // 25 meters or better to lock immediately
+        maxWaitTimeMs: 6000, // wait up to 6s for satellite precision
+        timeoutMs: 14000,
+        reverseGeocode: true,
+        onProgress: (p) => {
+          setGpsProgressMsg(p.message);
+        },
+      });
+
+      const dist = distanceMeters(
+        result.latitude,
+        result.longitude,
+        officeLat,
+        officeLng
+      );
+
+      const allowedRadius = radius + Math.min(result.accuracy, 50);
+      const isInside = dist <= allowedRadius;
+
+      let addr = wfh
+        ? "Work From Home"
+        : (result.address || `Office Premise (Lat: ${result.latitude.toFixed(5)}, Lon: ${result.longitude.toFixed(5)})`);
+
+      setConfirmData({
+        pos: result.rawPosition,
+        latitude: result.latitude,
+        longitude: result.longitude,
+        accuracy: result.accuracy,
+        address: addr,
+        distance: dist,
+        isInside,
+        isHighPrecision: result.isHighPrecision,
+      });
+    } catch (err: any) {
+      setMsg({
+        ok: false,
+        text: err?.message || "Could not read your location. Move to an open area and retry.",
+      });
+    } finally {
+      setLocLoading(false);
+      setGpsProgressMsg(null);
+    }
   }
 
   function handleConfirmPunch() {
     if (!confirmData) return;
-    const { pos, address } = confirmData;
+    const { latitude, longitude, accuracy, address } = confirmData;
     setConfirmData(null);
     start(async () => {
       const r = await punchWithGps({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
+        lat: latitude,
+        lng: longitude,
+        accuracy,
         wfh,
         address,
       });
@@ -136,10 +158,21 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius, 
             done ? "bg-slate-400" : out ? "bg-gradient-to-br from-rose-500 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-violet-600")}>
           <span className="flex flex-col items-center gap-1.5 sm:gap-2">
             {pending || locLoading ? <Loader2 className="h-8 w-8 sm:h-9 sm:w-9 animate-spin" /> : <MapPin className="h-8 w-8 sm:h-9 sm:w-9" />}
-            <span className="text-base sm:text-lg font-semibold">{pending || locLoading ? "Checking..." : label}</span>
+            <span className="text-base sm:text-lg font-semibold">{pending ? "Recording..." : locLoading ? "Locating..." : label}</span>
           </span>
         </motion.button>
       </div>
+
+      {locLoading && gpsProgressMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 rounded-full px-4 py-1.5 shadow-sm max-w-xs mx-auto animate-pulse"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+          <span className="truncate">{gpsProgressMsg}</span>
+        </motion.div>
+      )}
 
       <p className="max-w-xs text-xs text-slate-500 mx-auto">Location punch works within {radius} m of {officeName}.</p>
 
@@ -177,44 +210,60 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius, 
             {!wfh && (
               <div>
                 <LivePunchMap
-                  employeeLat={confirmData.pos.coords.latitude}
-                  employeeLng={confirmData.pos.coords.longitude}
+                  employeeLat={confirmData.latitude}
+                  employeeLng={confirmData.longitude}
                   officeLat={officeLat}
                   officeLng={officeLng}
                   officeRadius={radius}
                   officeName={officeName}
-                  isInside={
-                    Math.hypot(
-                      (confirmData.pos.coords.latitude - officeLat) * 111000,
-                      (confirmData.pos.coords.longitude - officeLng) * 111000 * Math.cos((officeLat * Math.PI) / 180)
-                    ) <= radius
-                  }
+                  isInside={confirmData.isInside}
                   height="180px"
                 />
               </div>
             )}
 
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3.5 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
-                <MapPin className="h-4 w-4" /> বর্তমান লোকেশন / ঠিকানা:
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3.5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-indigo-700">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" /> বর্তমান লোকেশন / ঠিকানা:
+                </span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1",
+                  confirmData.accuracy <= 30
+                    ? "bg-emerald-100 text-emerald-700"
+                    : confirmData.accuracy <= 80
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-rose-100 text-rose-700"
+                )}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", confirmData.accuracy <= 30 ? "bg-emerald-500" : confirmData.accuracy <= 80 ? "bg-amber-500" : "bg-rose-500")} />
+                  GPS Precision: ±{Math.round(confirmData.accuracy)}m
+                </span>
               </div>
               <p className="text-xs font-semibold text-slate-800 leading-relaxed">
                 {confirmData.address}
               </p>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>{wfh ? "Work From Home (WFH মোড)" : `GPS: ${confirmData.pos.coords.latitude.toFixed(4)}, ${confirmData.pos.coords.longitude.toFixed(4)}`}</span>
+              <div className="flex items-center justify-between text-[11px] text-slate-600 font-medium pt-1 border-t border-indigo-100/60">
+                <span>
+                  {wfh
+                    ? "Work From Home (WFH মোড)"
+                    : `GPS: ${confirmData.latitude.toFixed(5)}, ${confirmData.longitude.toFixed(5)}`}
+                </span>
                 {!wfh && (
-                  <span className="text-slate-600 font-semibold">
-                    দূরত্ব: {Math.round(
-                      Math.hypot(
-                        (confirmData.pos.coords.latitude - officeLat) * 111000,
-                        (confirmData.pos.coords.longitude - officeLng) * 111000 * Math.cos((officeLat * Math.PI) / 180)
-                      )
-                    )}m
+                  <span className={cn("font-bold", confirmData.isInside ? "text-emerald-700" : "text-amber-600")}>
+                    দূরত্ব: {Math.round(confirmData.distance)}m {confirmData.isInside ? "(অনুমোদিত সীমানায়)" : "(সীমানার বাইরে)"}
                   </span>
                 )}
               </div>
             </div>
+
+            {!wfh && !confirmData.isInside && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-2.5 text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  আপনি অফিস এরিয়া ({radius}m) এর বাইরে আছেন। পাঞ্চ সাবমিট করলে এটি <strong>অ্যাডমিন অনুমোদনের</strong> জন্য পেন্ডিং থাকবে।
+                </span>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button

@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../models/office_location_model.dart';
+import '../services/attendance_service.dart';
 import '../services/workflow_service.dart';
 import '../widgets/glass_container.dart';
 
@@ -409,10 +410,14 @@ class _OfficeFormBottomSheetState extends State<_OfficeFormBottomSheet> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 12),
-      );
+      final position = await AttendanceService().getCurrentPosition();
+      if (position == null) {
+        setState(() {
+          _locating = false;
+          _gpsMessage = 'Could not get accurate GPS fix. Please retry.';
+        });
+        return;
+      }
 
       final latDouble = position.latitude;
       final lngDouble = position.longitude;

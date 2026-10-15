@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Navigation, Loader2 } from "lucide-react";
+import { getAccurateCurrentPosition } from "@/lib/gps-client";
 
 interface MapPickerProps {
   latitude: number;
@@ -173,48 +174,33 @@ export default function MapPicker({
     }
   }, [latitude, longitude]);
 
-  // Handle current GPS location
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) return;
+  // Handle current GPS location with high precision and cache-busting
+  const handleDetectGPS = async () => {
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+    try {
+      const res = await getAccurateCurrentPosition({
+        desiredAccuracy: 20,
+        maxWaitTimeMs: 5500,
+        timeoutMs: 12000,
+        reverseGeocode: true,
+      });
 
-        if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-          markerRef.current.setLatLng([lat, lng]);
-          circleRef.current.setLatLng([lat, lng]);
-          mapInstanceRef.current.flyTo([lat, lng], 17);
-        }
+      const lat = res.latitude;
+      const lng = res.longitude;
 
-        try {
-          setAddressLoading(true);
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.display_name) {
-              const parts = data.display_name.split(",");
-              const shortAddr = parts.length > 4 ? parts.slice(0, 4).join(", ").trim() : data.display_name;
-              onChange({ latitude: lat, longitude: lng, address: shortAddr });
-              setLocating(false);
-              setAddressLoading(false);
-              return;
-            }
-          }
-        } catch (_) {}
+      if (mapInstanceRef.current && markerRef.current && circleRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+        circleRef.current.setLatLng([lat, lng]);
+        mapInstanceRef.current.flyTo([lat, lng], 17);
+      }
 
-        setLocating(false);
-        setAddressLoading(false);
-        onChange({ latitude: lat, longitude: lng });
-      },
-      () => {
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+      onChange({ latitude: lat, longitude: lng, address: res.address });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLocating(false);
+      setAddressLoading(false);
+    }
   };
 
   return (

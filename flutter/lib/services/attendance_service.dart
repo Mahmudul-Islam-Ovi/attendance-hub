@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -23,7 +24,11 @@ class AttendanceService {
     return 2 * r * asin(sqrt(a));
   }
 
-  Future<Position?> getCurrentPosition() async {
+  Future<Position?> getCurrentPosition({
+    double desiredAccuracy = 25.0,
+    Duration maxWaitTime = const Duration(seconds: 6),
+    Duration timeout = const Duration(seconds: 12),
+  }) async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       return null;
@@ -41,23 +46,88 @@ class AttendanceService {
       return null;
     }
 
+    final completer = Completer<Position?>();
+    StreamSubscription<Position>? subscription;
+    Position? bestPosition;
+    Timer? maxWaitTimer;
+    Timer? timeoutTimer;
+
+    void finish(Position? pos) {
+      if (!completer.isCompleted) {
+        subscription?.cancel();
+        maxWaitTimer?.cancel();
+        timeoutTimer?.cancel();
+        completer.complete(pos);
+      }
+    }
+
+    timeoutTimer = Timer(timeout, () {
+      finish(bestPosition);
+    });
+
     try {
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+      final LocationSettings locationSettings;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+          forceLocationManager: true, // Talk directly to GPS chip, bypassing old cache
+          intervalDuration: const Duration(milliseconds: 500),
+        );
+      } else {
+        locationSettings = const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+        );
+      }
+
+      subscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+        (Position position) {
+          if (bestPosition == null || position.accuracy < bestPosition!.accuracy) {
+            bestPosition = position;
+          }
+
+          if (position.accuracy <= desiredAccuracy) {
+            finish(position);
+            return;
+          }
+
+          maxWaitTimer ??= Timer(maxWaitTime, () {
+            finish(bestPosition);
+          });
+        },
+        onError: (e) {
+          debugPrint('Error from position stream: $e');
+          if (bestPosition != null) {
+            finish(bestPosition);
+          }
+        },
       );
     } catch (e) {
-      debugPrint('Error getting GPS position: $e');
-      return null;
+      debugPrint('Error starting position stream: $e');
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+          timeLimit: const Duration(seconds: 8),
+        );
+        finish(pos);
+      } catch (_) {
+        finish(null);
+      }
     }
+
+    return completer.future;
   }
 
   Future<String> getAddressFromCoordinates(double lat, double lon) async {
     try {
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=18&addressdetails=1',
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=18&addressdetails=1&_t=${DateTime.now().millisecondsSinceEpoch}',
       );
-      final res = await http.get(url, headers: {'User-Agent': 'AttendanceHubApp/1.0'}).timeout(
+      final res = await http.get(url, headers: {
+        'User-Agent': 'AttendanceHubApp/1.0',
+        'Cache-Control': 'no-cache',
+      }).timeout(
         const Duration(seconds: 4),
       );
       if (res.statusCode == 200) {
@@ -101,6 +171,7 @@ class AttendanceService {
       targetLng,
     );
 
+    final allowedRadius = targetRadius + (pos.accuracy.clamp(0, 50));
     final address = await getAddressFromCoordinates(pos.latitude, pos.longitude);
 
     return {
@@ -109,7 +180,7 @@ class AttendanceService {
       'longitude': pos.longitude,
       'accuracy': pos.accuracy,
       'distance': distance,
-      'isOutOfBounds': distance > targetRadius,
+      'isOutOfBounds': distance > allowedRadius,
       'address': address,
       'isMocked': pos.isMocked,
       'officeLat': targetLat,
