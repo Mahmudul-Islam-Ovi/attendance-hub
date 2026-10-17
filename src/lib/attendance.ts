@@ -19,9 +19,29 @@ export async function recordPunch(i: PunchInput): Promise<PunchResult> {
 
   const now = i.at ?? new Date();
   const workDate = todayDate(now);
-  const loc = i.locationId
-    ? await prisma.officeLocation.findUnique({ where: { id: i.locationId } })
-    : user.officeLocation ?? (await prisma.officeLocation.findFirst({ where: { isActive: true } }));
+  let loc = null;
+  if (i.locationId) {
+    loc = await prisma.officeLocation.findUnique({ where: { id: i.locationId } });
+  }
+  if (!loc) {
+    loc = user.officeLocation;
+  }
+  if (!loc && i.lat !== undefined && i.lng !== undefined) {
+    const activeOffices = await prisma.officeLocation.findMany({ where: { isActive: true } });
+    if (activeOffices.length > 0) {
+      let minDist = Infinity;
+      for (const off of activeOffices) {
+        const d = distanceMeters(i.lat, i.lng, off.latitude, off.longitude);
+        if (d < minDist) {
+          minDist = d;
+          loc = off;
+        }
+      }
+    }
+  }
+  if (!loc) {
+    loc = await prisma.officeLocation.findFirst({ where: { isActive: true } });
+  }
 
   let distance: number | null = null;
   let address: string | null = null;
@@ -39,7 +59,8 @@ export async function recordPunch(i: PunchInput): Promise<PunchResult> {
     if (distance > allowed) {
       isPendingApproval = true;
     }
-    address = i.address?.trim() || `${loc.name} (${Math.round(distance)} m from entrance)`;
+    const distStr = distance >= 1000 ? `${(distance / 1000).toFixed(2)} km` : `${Math.round(distance)} m`;
+    address = i.address?.trim() || `${loc.name} (${distStr} from entrance)`;
   } else if (i.address) {
     address = i.address.trim();
   } else if (loc) {

@@ -1,3 +1,5 @@
+import '../constants/app_config.dart';
+
 class OfficeLocationModel {
   final String id;
   final String name;
@@ -24,11 +26,11 @@ class OfficeLocationModel {
   factory OfficeLocationModel.fromJson(Map<String, dynamic> json) {
     return OfficeLocationModel(
       id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      address: json['address']?.toString() ?? '',
-      latitude: (json['latitude'] as num?)?.toDouble() ?? 23.7330,
-      longitude: (json['longitude'] as num?)?.toDouble() ?? 90.4172,
-      radiusMeters: (json['radiusMeters'] as num?)?.toInt() ?? 150,
+      name: json['name']?.toString() ?? AppConfig.officeName,
+      address: json['address']?.toString() ?? AppConfig.officeAddress,
+      latitude: (json['latitude'] as num?)?.toDouble() ?? AppConfig.officeLat,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? AppConfig.officeLng,
+      radiusMeters: (json['radiusMeters'] as num?)?.toInt() ?? AppConfig.officeRadiusMeters.toInt(),
       isActive: json['isActive'] ?? true,
       employeeCount: (json['employeeCount'] as num?)?.toInt() ?? 0,
       punchCount: (json['punchCount'] as num?)?.toInt() ?? 0,

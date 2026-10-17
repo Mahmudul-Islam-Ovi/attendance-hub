@@ -1,3 +1,5 @@
+import '../constants/app_config.dart';
+
 class UserModel {
   final String id;
   final String employeeCode;
@@ -15,6 +17,7 @@ class UserModel {
   final String shiftStart;
   final String shiftEnd;
   final double basicSalary;
+  final String? officeLocationId;
   final String? officeLocationName;
   final String? officeLocationAddress;
   final double? officeLocationLat;
@@ -38,6 +41,7 @@ class UserModel {
     this.shiftStart = '09:00',
     this.shiftEnd = '18:00',
     this.basicSalary = 0,
+    this.officeLocationId,
     this.officeLocationName,
     this.officeLocationAddress,
     this.officeLocationLat,
@@ -59,13 +63,15 @@ class UserModel {
         'MANAGER',
         'DIRECTOR',
         'DEPT_HEAD',
-      ].contains(role) || isAdmin;
+        'TEAM_LEAD',
+      ].contains(role);
 
-  bool get canAddEmployee => isAdmin;
+  bool get canAddEmployee => isAdmin || role == 'HR_ADMIN';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     String? deptName;
     String? deptCol;
+
     if (json['department'] is Map) {
       deptName = json['department']['name'];
       deptCol = json['department']['color'];
@@ -74,6 +80,7 @@ class UserModel {
       deptCol = json['departmentColor'];
     }
 
+    String? offId;
     String? offName;
     String? offAddr;
     double? offLat;
@@ -81,25 +88,30 @@ class UserModel {
     int? offRad;
 
     if (json['officeLocation'] is Map) {
+      offId = json['officeLocation']['id'];
       offName = json['officeLocation']['name'];
       offAddr = json['officeLocation']['address'];
       offLat = (json['officeLocation']['latitude'] as num?)?.toDouble();
       offLng = (json['officeLocation']['longitude'] as num?)?.toDouble();
       offRad = (json['officeLocation']['radiusMeters'] as num?)?.toInt();
     } else if (json['officeLocationName'] != null) {
+      offId = json['officeLocationId'];
       offName = json['officeLocationName'];
       offAddr = json['officeLocationAddress'];
       offLat = (json['officeLocationLat'] as num?)?.toDouble();
       offLng = (json['officeLocationLng'] as num?)?.toDouble();
       offRad = (json['officeLocationRadius'] as num?)?.toInt();
+    } else if (json['officeLocationId'] != null) {
+      offId = json['officeLocationId'];
     }
 
-    // Default fallback to Head Office
-    offName ??= 'Head Office';
-    offAddr ??= 'Main building, Dhaka';
-    offLat ??= 23.7330;
-    offLng ??= 90.4172;
-    offRad ??= 200;
+    // Dynamic fallback to AppConfig active office
+    offId ??= AppConfig.officeId;
+    offName ??= AppConfig.officeName;
+    offAddr ??= AppConfig.officeAddress;
+    offLat ??= AppConfig.officeLat;
+    offLng ??= AppConfig.officeLng;
+    offRad ??= AppConfig.officeRadiusMeters.toInt();
 
     return UserModel(
       id: json['id'] ?? '',
@@ -118,6 +130,7 @@ class UserModel {
       shiftStart: json['shiftStart'] ?? '09:00',
       shiftEnd: json['shiftEnd'] ?? '18:00',
       basicSalary: (json['basicSalary'] as num?)?.toDouble() ?? 0.0,
+      officeLocationId: offId,
       officeLocationName: offName,
       officeLocationAddress: offAddr,
       officeLocationLat: offLat,
@@ -144,6 +157,7 @@ class UserModel {
       'shiftStart': shiftStart,
       'shiftEnd': shiftEnd,
       'basicSalary': basicSalary,
+      'officeLocationId': officeLocationId,
       'officeLocationName': officeLocationName,
       'officeLocationAddress': officeLocationAddress,
       'officeLocationLat': officeLocationLat,

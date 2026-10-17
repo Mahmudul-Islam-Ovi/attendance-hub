@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_config.dart';
 import '../models/attendance_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/attendance_service.dart';
@@ -180,6 +183,8 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       officeLng: user.officeLocationLng,
       officeRadius: user.officeLocationRadius,
       officeName: user.officeLocationName,
+      officeId: user.officeLocationId,
+      officeAddress: user.officeLocationAddress,
     );
 
     if (!mounted) return;
@@ -211,459 +216,25 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
   }
 
   void _showPunchConfirmationModal(Map<String, dynamic>? locDetails) {
-    final now = DateTime.now();
-    final timeStr = DateFormat('hh:mm:ss a').format(now);
-    final dateStr = DateFormat('EEEE, d MMMM yyyy').format(now);
-
-    final isPunchIn = !_isPunchedIn;
-    final actionLabel = isPunchIn ? 'Punch In (হাজিরা প্রবেশ)' : 'Punch Out (হাজিরা প্রস্থান)';
-    final actionColor = isPunchIn ? AppColors.present : AppColors.punchOutGradient.colors.first;
-
-    final String address = locDetails != null
-        ? (locDetails['address'] ?? 'Coordinates: ${locDetails['latitude']}, ${locDetails['longitude']}')
-        : (_isWfh ? 'Work From Home (হোম লোকেশন)' : 'Office Premise');
-
-    final double? distance = locDetails?['distance'];
-    final bool isOutOfBounds = locDetails?['isOutOfBounds'] == true;
-
-    final double empLat = (locDetails?['latitude'] as num?)?.toDouble() ?? 23.7330;
-    final double empLng = (locDetails?['longitude'] as num?)?.toDouble() ?? 90.4172;
-    final double offLat = (locDetails?['officeLat'] as num?)?.toDouble() ?? 23.7330;
-    final double offLng = (locDetails?['officeLng'] as num?)?.toDouble() ?? 90.4172;
-    final double offRadius = (locDetails?['officeRadius'] as num?)?.toDouble() ?? 200.0;
-
-    final isLate = !_isWfh && (now.hour > 9 || (now.hour == 9 && now.minute > 15));
-    final String projectedStatus = _isWfh
-        ? 'WFH'
-        : (isOutOfBounds ? 'PENDING_APPROVAL' : (isLate ? 'LATE' : 'PRESENT'));
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 20,
-                offset: Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top Drag Indicator
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.slate300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-
-              // Title Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: actionColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          isPunchIn ? Icons.login : Icons.logout,
-                          color: actionColor,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Confirm Attendance Punch',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textDark,
-                            ),
-                          ),
-                          Text(
-                            actionLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: actionColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Current Time Card
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.slate100.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('সময় (Punch Time)', style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 2),
-                        Text(
-                          timeStr,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textDark),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      dateStr,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Read-Only Live GPS Map
-              if (!_isWfh) ...[
-                Container(
-                  height: 165,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isOutOfBounds ? AppColors.leave.withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      FlutterMap(
-                        options: MapOptions(
-                          initialCenter: LatLng(empLat, empLng),
-                          initialZoom: 16.0,
-                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.attendancehub.app',
-                          ),
-                          // Office Geofence Circle
-                          CircleLayer(
-                            circles: [
-                              CircleMarker(
-                                point: LatLng(offLat, offLng),
-                                color: (isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.18),
-                                borderColor: isOutOfBounds ? AppColors.leave : AppColors.present,
-                                borderStrokeWidth: 2,
-                                radius: offRadius,
-                                useRadiusInMeter: true,
-                              ),
-                            ],
-                          ),
-                          // Markers
-                          MarkerLayer(
-                            markers: [
-                              // Office Building Marker
-                              Marker(
-                                point: LatLng(offLat, offLng),
-                                width: 34,
-                                height: 34,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                                  ),
-                                  child: const Icon(Icons.business, color: Colors.white, size: 20),
-                                ),
-                              ),
-                              // Employee Live Location Marker (Read-Only)
-                              Marker(
-                                point: LatLng(empLat, empLng),
-                                width: 34,
-                                height: 34,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: isOutOfBounds ? AppColors.leave : AppColors.present,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2.5),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.5),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 20),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      // Top Status Badge
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isOutOfBounds ? Icons.cancel : Icons.check_circle,
-                                size: 14,
-                                color: isOutOfBounds ? AppColors.leave : AppColors.present,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isOutOfBounds
-                                    ? 'সীমানার বাইরে (${distance?.round() ?? 0}m)'
-                                    : 'সীমানার ভেতরে (${distance?.round() ?? 0}m)',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isOutOfBounds ? AppColors.leaveText : AppColors.present,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 6,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            '🔒 Locked Live GPS',
-                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Location Address Card (Prominent & Clear)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isOutOfBounds && !_isWfh
-                      ? AppColors.leaveBg.withOpacity(0.6)
-                      : AppColors.primary.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isOutOfBounds && !_isWfh
-                        ? AppColors.leave.withOpacity(0.4)
-                        : AppColors.primary.withOpacity(0.2),
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'বর্তমান লোকেশন / ঠিকানা:',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: isOutOfBounds && !_isWfh ? AppColors.leaveText : AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (locDetails?['accuracy'] != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: ((locDetails!['accuracy'] as num).toDouble() <= 30
-                                      ? AppColors.present
-                                      : AppColors.leave)
-                                  .withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'GPS: ±${(locDetails['accuracy'] as num).round()}m',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: (locDetails['accuracy'] as num).toDouble() <= 30
-                                    ? AppColors.present
-                                    : AppColors.leaveText,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      address,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Bounds distance badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _isWfh
-                                ? Icons.home_work
-                                : (isOutOfBounds ? Icons.warning_amber_rounded : Icons.check_circle),
-                            size: 15,
-                            color: _isWfh
-                                ? AppColors.wfh
-                                : (isOutOfBounds ? AppColors.leaveText : AppColors.present),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              _isWfh
-                                  ? 'Work From Home (WFH মোড)'
-                                  : (isOutOfBounds
-                                      ? 'অফিস সীমানার বাইরে (${distance?.round() ?? 0}m দূরে)'
-                                      : 'অফিস সীমানার ভেতরে (${distance?.round() ?? 0}m দূরত্ব)'),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: _isWfh
-                                    ? AppColors.wfh
-                                    : (isOutOfBounds ? AppColors.leaveText : AppColors.present),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Status Preview
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'প্রত্যাশিত উপস্থিতি স্ট্যাটাস:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
-                  ),
-                  StatusBadge(status: projectedStatus),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Action Buttons: Cancel & Submit
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        side: const BorderSide(color: AppColors.border),
-                      ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('বাতিল (Cancel)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 3,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: actionColor,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 2,
-                      ),
-                      icon: const Icon(Icons.fingerprint, color: Colors.white, size: 22),
-                      label: Text(
-                        isPunchIn ? 'পাঞ্চ ইন সাবমিট' : 'পাঞ্চ আউট সাবমিট',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _executePunch(locDetails?['position'], address);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        return _LivePunchConfirmationModal(
+          initialLocDetails: locDetails,
+          isPunchIn: !_isPunchedIn,
+          isWfh: _isWfh,
+          onConfirm: (pos, addr, offId) {
+            Navigator.pop(ctx);
+            _executePunch(pos, addr, offId);
+          },
         );
       },
     );
   }
 
-  Future<void> _executePunch(dynamic position, [String? address]) async {
+  Future<void> _executePunch(dynamic position, [String? address, String? officeId]) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.user;
     if (user == null) return;
@@ -681,6 +252,10 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
       position: position,
       address: address,
       action: targetAction,
+      officeId: officeId ?? user.officeLocationId,
+      officeLat: user.officeLocationLat,
+      officeLng: user.officeLocationLng,
+      officeRadius: user.officeLocationRadius,
     );
 
     if (mounted) {
@@ -982,7 +557,7 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
           ),
           const SizedBox(height: 14),
           Text(
-            'GPS punch validates presence within ${user?.officeLocationRadius ?? 200}m of ${user?.officeLocationName ?? "Head Office"}.',
+            'GPS punch validates presence within ${user?.officeLocationRadius ?? AppConfig.officeRadiusMeters.round()}m of ${user?.officeLocationName ?? AppConfig.officeName}.',
             style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
@@ -1110,6 +685,702 @@ class _AttendancePunchScreenState extends State<AttendancePunchScreen> with Sing
         ],
       ),
     ),
+    );
+  }
+}
+
+class _LivePunchConfirmationModal extends StatefulWidget {
+  final Map<String, dynamic>? initialLocDetails;
+  final bool isPunchIn;
+  final bool isWfh;
+  final Function(Position? position, String? address, String? officeId) onConfirm;
+
+  const _LivePunchConfirmationModal({
+    required this.initialLocDetails,
+    required this.isPunchIn,
+    required this.isWfh,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_LivePunchConfirmationModal> createState() => _LivePunchConfirmationModalState();
+}
+
+class _LivePunchConfirmationModalState extends State<_LivePunchConfirmationModal> {
+  final AttendanceService _attendance = AttendanceService();
+  late MapController _mapController;
+  StreamSubscription<Position>? _positionStream;
+
+  Position? _currentPos;
+  late double _empLat;
+  late double _empLng;
+  late double _accuracy;
+  late double _distance;
+  late bool _isOutOfBounds;
+  late String _address;
+  bool _isRefreshing = false;
+
+  late String _officeId;
+  late String _officeName;
+  late String? _officeAddress;
+  late double _officeLat;
+  late double _officeLng;
+  late double _officeRadius;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+
+    final loc = widget.initialLocDetails;
+    _currentPos = loc?['position'] as Position?;
+    _empLat = (loc?['latitude'] as num?)?.toDouble() ?? AppConfig.officeLat;
+    _empLng = (loc?['longitude'] as num?)?.toDouble() ?? AppConfig.officeLng;
+    _accuracy = (loc?['accuracy'] as num?)?.toDouble() ?? 50.0;
+    _distance = (loc?['distance'] as num?)?.toDouble() ?? 0.0;
+    _isOutOfBounds = loc?['isOutOfBounds'] == true;
+    _address = loc?['address'] ??
+        (widget.isWfh ? 'Work From Home (হোম লোকেশন)' : 'GPS: $_empLat, $_empLng');
+
+    _officeId = loc?['officeId'] ?? AppConfig.officeId;
+    _officeName = loc?['officeName'] ?? AppConfig.officeName;
+    _officeAddress = loc?['officeAddress'] ?? AppConfig.officeAddress;
+    _officeLat = (loc?['officeLat'] as num?)?.toDouble() ?? AppConfig.officeLat;
+    _officeLng = (loc?['officeLng'] as num?)?.toDouble() ?? AppConfig.officeLng;
+    _officeRadius = (loc?['officeRadius'] as num?)?.toDouble() ?? AppConfig.officeRadiusMeters;
+
+    _startLiveGpsStream();
+  }
+
+  void _startLiveGpsStream() {
+    if (widget.isWfh) return;
+    try {
+      final settings = defaultTargetPlatform == TargetPlatform.android
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.best,
+              distanceFilter: 1,
+              intervalDuration: const Duration(seconds: 1),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.best,
+              distanceFilter: 1,
+            );
+
+      _positionStream = Geolocator.getPositionStream(locationSettings: settings).listen(
+        (pos) {
+          if (!mounted) return;
+          _updateWithNewPosition(pos);
+        },
+        onError: (err) {
+          debugPrint('Live GPS stream error: $err');
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to start live GPS stream: $e');
+    }
+  }
+
+  void _updateWithNewPosition(Position pos) {
+    final d = _attendance.distanceMeters(pos.latitude, pos.longitude, _officeLat, _officeLng);
+    final allowedRadius = _officeRadius + (pos.accuracy.clamp(0.0, 30.0));
+    final outOfBounds = d > allowedRadius;
+
+    setState(() {
+      _currentPos = pos;
+      _empLat = pos.latitude;
+      _empLng = pos.longitude;
+      _accuracy = pos.accuracy;
+      _distance = d;
+      _isOutOfBounds = outOfBounds;
+    });
+
+    try {
+      _mapController.move(LatLng(pos.latitude, pos.longitude), _mapController.camera.zoom);
+    } catch (_) {}
+  }
+
+  Future<void> _refreshGpsManually() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 5),
+      );
+      if (mounted) {
+        _updateWithNewPosition(pos);
+        final freshAddr = await _attendance.getAddressFromCoordinates(pos.latitude, pos.longitude);
+        if (mounted && freshAddr.isNotEmpty) {
+          setState(() => _address = freshAddr);
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final timeStr = DateFormat('hh:mm:ss a').format(now);
+    final dateStr = DateFormat('EEEE, d MMMM yyyy').format(now);
+
+    final isPunchIn = widget.isPunchIn;
+    final actionLabel = isPunchIn ? 'Punch In (হাজিরা প্রবেশ)' : 'Punch Out (হাজিরা প্রস্থান)';
+    final actionColor = isPunchIn ? AppColors.present : AppColors.punchOutGradient.colors.first;
+
+    final isLate = !widget.isWfh && (now.hour > 9 || (now.hour == 9 && now.minute > 15));
+    final String projectedStatus = widget.isWfh
+        ? 'WFH'
+        : (_isOutOfBounds ? 'PENDING_APPROVAL' : (isLate ? 'LATE' : 'PRESENT'));
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 20,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Drag Indicator
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.slate300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+
+            // Title Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: actionColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isPunchIn ? Icons.login : Icons.logout,
+                        color: actionColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Confirm Attendance Punch',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        Text(
+                          actionLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: actionColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppColors.textMuted),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Current Time Card
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.slate100.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('সময় (Punch Time)', style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(
+                        timeStr,
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textDark),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    dateStr,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Dynamic Live GPS Map
+            if (!widget.isWfh) ...[
+              Container(
+                height: 175,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _isOutOfBounds
+                        ? AppColors.leave.withValues(alpha: 0.4)
+                        : AppColors.present.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: LatLng(_empLat, _empLng),
+                        initialZoom: 16.0,
+                        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.attendancehub.app',
+                        ),
+                        // Direct Radar Path Line between Employee & Office
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: [
+                                LatLng(_empLat, _empLng),
+                                LatLng(_officeLat, _officeLng),
+                              ],
+                              strokeWidth: 2.5,
+                              color: (_isOutOfBounds ? AppColors.leave : AppColors.present)
+                                  .withValues(alpha: 0.75),
+                            ),
+                          ],
+                        ),
+                        // Office Geofence Circle
+                        CircleLayer(
+                          circles: [
+                            CircleMarker(
+                              point: LatLng(_officeLat, _officeLng),
+                              color: (_isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.18),
+                              borderColor: _isOutOfBounds ? AppColors.leave : AppColors.present,
+                              borderStrokeWidth: 2,
+                              radius: _officeRadius,
+                              useRadiusInMeter: true,
+                            ),
+                          ],
+                        ),
+                        // Markers
+                        MarkerLayer(
+                          markers: [
+                            // Office Building Marker
+                            Marker(
+                              point: LatLng(_officeLat, _officeLng),
+                              width: 36,
+                              height: 36,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                ),
+                                child: const Icon(Icons.business, color: Colors.white, size: 20),
+                              ),
+                            ),
+                            // Employee Live Location Marker (Dynamic)
+                            Marker(
+                              point: LatLng(_empLat, _empLng),
+                              width: 36,
+                              height: 36,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _isOutOfBounds ? AppColors.leave : AppColors.present,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (_isOutOfBounds ? AppColors.leave : AppColors.present).withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 22),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    // Top Status Badge (Live Dynamic Distance)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isOutOfBounds ? Icons.cancel : Icons.check_circle,
+                              size: 14,
+                              color: _isOutOfBounds ? AppColors.leave : AppColors.present,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _isOutOfBounds
+                                  ? 'সীমানার বাইরে (${AttendanceService.formatDistance(_distance)})'
+                                  : 'সীমানার ভেতরে (${AttendanceService.formatDistance(_distance)})',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: _isOutOfBounds ? AppColors.leaveText : AppColors.present,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Top-right focus buttons
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              _mapController.move(LatLng(_empLat, _empLng), 16.5);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(6),
+                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                              ),
+                              child: const Icon(Icons.my_location, size: 14, color: AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () {
+                              _mapController.move(LatLng(_officeLat, _officeLng), 16.5);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(6),
+                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                              ),
+                              child: const Icon(Icons.business, size: 14, color: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Bottom-right Live GPS badge
+                    Positioned(
+                      bottom: 6,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'Live GPS Stream',
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Location Address & Office Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _isOutOfBounds && !widget.isWfh
+                    ? AppColors.leaveBg.withOpacity(0.6)
+                    : AppColors.primary.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isOutOfBounds && !widget.isWfh
+                      ? AppColors.leave.withOpacity(0.4)
+                      : AppColors.primary.withOpacity(0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            color: _isOutOfBounds && !widget.isWfh ? AppColors.leaveText : AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'বর্তমান লোকেশন / ঠিকানা:',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: _isOutOfBounds && !widget.isWfh ? AppColors.leaveText : AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (_accuracy <= 30 ? AppColors.present : AppColors.leave).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'GPS: ±${_accuracy.round()}m',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: _accuracy <= 30 ? AppColors.present : AppColors.leaveText,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: _refreshGpsManually,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: _isRefreshing
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.refresh, size: 16, color: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _address,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Target Office Info
+                  if (!widget.isWfh) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.slate200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.business_rounded, size: 15, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'অফিস: $_officeName (${_officeAddress ?? AttendanceService.formatDistance(_officeRadius) + " পরিধি"})',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDark,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Dynamic Bounds distance badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.isWfh
+                              ? Icons.home_work
+                              : (_isOutOfBounds ? Icons.warning_amber_rounded : Icons.check_circle),
+                          size: 16,
+                          color: widget.isWfh
+                              ? AppColors.wfh
+                              : (_isOutOfBounds ? AppColors.leaveText : AppColors.present),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            widget.isWfh
+                                ? 'Work From Home (WFH মোড)'
+                                : (_isOutOfBounds
+                                    ? 'অফিস সীমানার বাইরে (${AttendanceService.formatDistance(_distance)} দূরে)'
+                                    : 'অফিস সীমানার ভেতরে (${AttendanceService.formatDistance(_distance)} দূরত্ব)'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: widget.isWfh
+                                  ? AppColors.wfh
+                                  : (_isOutOfBounds ? AppColors.leaveText : AppColors.present),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Status Preview
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'প্রত্যাশিত উপস্থিতি স্ট্যাটাস:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                ),
+                StatusBadge(status: projectedStatus),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Action Buttons: Cancel & Submit
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('বাতিল (Cancel)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: actionColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(Icons.fingerprint, color: Colors.white, size: 22),
+                    label: Text(
+                      isPunchIn ? 'পাঞ্চ ইন সাবমিট' : 'পাঞ্চ আউট সাবমিট',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                    ),
+                    onPressed: () {
+                      widget.onConfirm(_currentPos, _address, _officeId);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

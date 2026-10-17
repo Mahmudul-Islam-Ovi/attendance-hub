@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       },
       include: {
         department: { select: { id: true, name: true, color: true } },
-        officeLocation: { select: { id: true, name: true, latitude: true, longitude: true, radiusMeters: true } },
+        officeLocation: { select: { id: true, name: true, address: true, latitude: true, longitude: true, radiusMeters: true } },
       },
     });
 
@@ -82,6 +82,7 @@ export async function POST(req: Request) {
         shiftEnd: user.shiftEnd ?? "18:00",
         wfhAllowed: user.wfhAllowed ?? false,
         basicSalary: user.basicSalary ?? 0,
+        officeLocation: user.officeLocation ?? (await prisma.officeLocation.findFirst({ where: { isActive: true } })),
       },
     });
   } catch (error) {

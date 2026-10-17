@@ -22,7 +22,7 @@ export default async function AttendancePage() {
       include: { user: { select: { name: true, department: { select: { name: true } } } } },
     }),
   ]);
-  const office = user.officeLocation;
+  const office = user.officeLocation ?? (await prisma.officeLocation.findFirst({ where: { isActive: true } }));
 
   return (
     <div className="w-full max-w-full overflow-hidden sm:overflow-visible">

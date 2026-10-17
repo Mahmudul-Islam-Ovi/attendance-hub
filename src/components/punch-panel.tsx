@@ -250,7 +250,7 @@ export function PunchPanel({ checkIn, checkOut, wfhAllowed, officeName, radius, 
                 </span>
                 {!wfh && (
                   <span className={cn("font-bold", confirmData.isInside ? "text-emerald-700" : "text-amber-600")}>
-                    দূরত্ব: {Math.round(confirmData.distance)}m {confirmData.isInside ? "(অনুমোদিত সীমানায়)" : "(সীমানার বাইরে)"}
+                    দূরত্ব: {confirmData.distance >= 1000 ? `${(confirmData.distance / 1000).toFixed(2)} km` : `${Math.round(confirmData.distance)}m`} {confirmData.isInside ? "(অনুমোদিত সীমানায়)" : "(সীমানার বাইরে)"}
                   </span>
                 )}
               </div>

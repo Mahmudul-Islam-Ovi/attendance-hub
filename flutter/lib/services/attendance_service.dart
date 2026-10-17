@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_config.dart';
 import '../models/attendance_model.dart';
+import '../models/office_location_model.dart';
 import 'api_service.dart';
 
 class AttendanceService {
@@ -147,7 +148,59 @@ class AttendanceService {
     if (d <= AppConfig.officeRadiusMeters) {
       return '${AppConfig.officeName}, Dhaka (${d.round()}m from center)';
     }
-    return '${AppConfig.officeName} Area (Out of bounds - ${d.round()}m)';
+    return '${AppConfig.officeName} Area (Out of bounds - ${formatDistance(d)})';
+  }
+
+  /// Format distances nicely (e.g. 45m or 14.8 km)
+  static String formatDistance(double? meters) {
+    if (meters == null) return '0m';
+    if (meters < 1000) {
+      return '${meters.round()}m';
+    } else {
+      final km = meters / 1000.0;
+      return '${km.toStringAsFixed(km < 10 ? 2 : 1)} km';
+    }
+  }
+
+  /// Fetch active offices dynamically from the API/cache
+  Future<List<OfficeLocationModel>> fetchActiveOffices() async {
+    final prefs = await SharedPreferences.getInstance();
+    const cacheKey = 'cached_offices_list';
+
+    try {
+      final res = await _api.get('/api/offices');
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        if (list.isNotEmpty) {
+          final offices = list.map((e) => OfficeLocationModel.fromJson(e)).toList();
+          await prefs.setString(cacheKey, res.body);
+          return offices;
+        }
+      }
+    } catch (_) {}
+
+    // Check cached list
+    final cachedStr = prefs.getString(cacheKey);
+    if (cachedStr != null) {
+      try {
+        final List list = jsonDecode(cachedStr);
+        if (list.isNotEmpty) {
+          return list.map((e) => OfficeLocationModel.fromJson(e)).toList();
+        }
+      } catch (_) {}
+    }
+
+    return [
+      OfficeLocationModel(
+        id: AppConfig.officeId,
+        name: AppConfig.officeName,
+        address: AppConfig.officeAddress,
+        latitude: AppConfig.officeLat,
+        longitude: AppConfig.officeLng,
+        radiusMeters: AppConfig.officeRadiusMeters.toInt(),
+        isActive: true,
+      ),
+    ];
   }
 
   Future<Map<String, dynamic>?> getLocationDetails({
@@ -155,14 +208,57 @@ class AttendanceService {
     double? officeLng,
     int? officeRadius,
     String? officeName,
+    String? officeId,
+    String? officeAddress,
   }) async {
-    final pos = await getCurrentPosition();
+    final pos = await getCurrentPosition(desiredAccuracy: 15.0);
     if (pos == null) return null;
 
-    final targetLat = officeLat ?? AppConfig.officeLat;
-    final targetLng = officeLng ?? AppConfig.officeLng;
-    final targetRadius = (officeRadius ?? AppConfig.officeRadiusMeters.toInt()).toDouble();
-    final targetName = officeName ?? AppConfig.officeName;
+    String targetId = officeId ?? AppConfig.officeId;
+    double targetLat = officeLat ?? AppConfig.officeLat;
+    double targetLng = officeLng ?? AppConfig.officeLng;
+    double targetRadius = (officeRadius ?? AppConfig.officeRadiusMeters.toInt()).toDouble();
+    String targetName = officeName ?? AppConfig.officeName;
+    String targetAddress = officeAddress ?? AppConfig.officeAddress;
+
+    // Dynamically look for active offices from server/cache to match the real/nearest office
+    try {
+      final offices = await fetchActiveOffices();
+      if (offices.isNotEmpty) {
+        OfficeLocationModel? matched;
+        if (officeId != null && officeId.isNotEmpty) {
+          matched = offices.firstWhere((o) => o.id == officeId, orElse: () => offices.first);
+        } else {
+          // Find closest active office to employee coordinates
+          OfficeLocationModel? nearest;
+          double minD = double.infinity;
+          for (final off in offices) {
+            final d = distanceMeters(pos.latitude, pos.longitude, off.latitude, off.longitude);
+            if (d < minD) {
+              minD = d;
+              nearest = off;
+            }
+          }
+          matched = nearest ?? offices.first;
+        }
+
+        targetId = matched.id;
+        targetName = matched.name;
+          targetAddress = matched.address;
+          targetLat = matched.latitude;
+          targetLng = matched.longitude;
+          targetRadius = matched.radiusMeters.toDouble();
+
+          AppConfig.updateActiveOffice(
+            id: targetId,
+            name: targetName,
+            address: targetAddress,
+            lat: targetLat,
+            lng: targetLng,
+            radius: targetRadius,
+          );
+      }
+    } catch (_) {}
 
     final distance = distanceMeters(
       pos.latitude,
@@ -171,7 +267,7 @@ class AttendanceService {
       targetLng,
     );
 
-    final allowedRadius = targetRadius + (pos.accuracy.clamp(0, 50));
+    final allowedRadius = targetRadius + (pos.accuracy.clamp(0.0, 30.0));
     final address = await getAddressFromCoordinates(pos.latitude, pos.longitude);
 
     return {
@@ -180,13 +276,16 @@ class AttendanceService {
       'longitude': pos.longitude,
       'accuracy': pos.accuracy,
       'distance': distance,
+      'formattedDistance': formatDistance(distance),
       'isOutOfBounds': distance > allowedRadius,
       'address': address,
       'isMocked': pos.isMocked,
+      'officeId': targetId,
       'officeLat': targetLat,
       'officeLng': targetLng,
       'officeRadius': targetRadius,
       'officeName': targetName,
+      'officeAddress': targetAddress,
     };
   }
 
@@ -246,6 +345,10 @@ class AttendanceService {
     Position? position,
     String? address,
     String? action,
+    String? officeId,
+    double? officeLat,
+    double? officeLng,
+    int? officeRadius,
   }) async {
     Position? pos = position;
     if (!isWfh && pos == null) {
@@ -258,13 +361,18 @@ class AttendanceService {
       }
     }
 
+    final targetLat = officeLat ?? AppConfig.officeLat;
+    final targetLng = officeLng ?? AppConfig.officeLng;
+    final targetRadius = (officeRadius ?? AppConfig.officeRadiusMeters.toInt()).toDouble();
+    final targetOfficeId = officeId ?? AppConfig.officeId;
+
     double? distance;
     if (pos != null && !isWfh) {
       distance = distanceMeters(
         pos.latitude,
         pos.longitude,
-        AppConfig.officeLat,
-        AppConfig.officeLng,
+        targetLat,
+        targetLng,
       );
     }
 
@@ -285,6 +393,7 @@ class AttendanceService {
         if (pos != null) 'lng': pos.longitude,
         if (pos != null) 'accuracy': pos.accuracy,
         if (address != null && address.isNotEmpty) 'address': address,
+        if (targetOfficeId.isNotEmpty) 'locationId': targetOfficeId,
       };
 
       final res = await _api.post('/api/attendance/punch', body: body);
@@ -339,8 +448,9 @@ class AttendanceService {
       );
     }
 
+    final allowedRadius = targetRadius + (pos?.accuracy.clamp(0.0, 30.0) ?? 0.0);
     final bool isOutOfBounds =
-        !isWfh && distance != null && distance > AppConfig.officeRadiusMeters;
+        !isWfh && distance != null && distance > allowedRadius;
     final now = DateTime.now();
     final nowStr = DateFormat('hh:mm a').format(now);
     final isLate = !isWfh && (now.hour > 9 || (now.hour == 9 && now.minute > 15));
@@ -349,7 +459,7 @@ class AttendanceService {
         (isWfh
             ? 'Work From Home'
             : (isOutOfBounds
-                ? 'Out of bounds (${distance.round()}m from office)'
+                ? 'Out of bounds (${formatDistance(distance)} from office)'
                 : 'Office HQ'));
 
     final bool doCheckIn = action == 'CHECK_IN' || (action == null && !alreadyPunchedIn);

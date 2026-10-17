@@ -9,12 +9,21 @@ export async function GET(req: Request) {
     const email = searchParams.get("email");
     const userId = searchParams.get("userId");
 
+    const enrichUser = async (u: any) => {
+      if (!u) return null;
+      if (!u.officeLocation) {
+        const defaultOffice = await prisma.officeLocation.findFirst({ where: { isActive: true } });
+        if (defaultOffice) u.officeLocation = defaultOffice;
+      }
+      return u;
+    };
+
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: { department: true, officeLocation: true },
       });
-      if (user) return NextResponse.json(user);
+      if (user) return NextResponse.json(await enrichUser(user));
     }
 
     if (email) {
@@ -22,7 +31,7 @@ export async function GET(req: Request) {
         where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
         include: { department: true, officeLocation: true },
       });
-      if (user) return NextResponse.json(user);
+      if (user) return NextResponse.json(await enrichUser(user));
     }
 
     let user = await getCurrentUser();
@@ -31,7 +40,7 @@ export async function GET(req: Request) {
         include: { department: true, officeLocation: true },
       });
     }
-    return NextResponse.json(user);
+    return NextResponse.json(await enrichUser(user));
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
